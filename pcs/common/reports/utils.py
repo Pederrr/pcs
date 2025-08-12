@@ -6,7 +6,7 @@ from pcs.common.reports.dto import ReportItemContextDto
 _file_role_translation = {
     file_type_codes.BOOTH_CONFIG: "Booth configuration",
     file_type_codes.BOOTH_KEY: "Booth key",
-    file_type_codes.CFGSYNC_CTL: "Config synchronization configuration",
+    file_type_codes.PCS_CFGSYNC_CTL: "Config synchronization configuration",
     file_type_codes.COROSYNC_AUTHKEY: "Corosync authkey",
     file_type_codes.COROSYNC_CONF: "Corosync configuration",
     file_type_codes.COROSYNC_QDEVICE_NSSDB: "QDevice certificate database",

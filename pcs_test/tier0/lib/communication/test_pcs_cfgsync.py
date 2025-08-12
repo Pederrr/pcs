@@ -5,7 +5,6 @@ from unittest import TestCase
 import pycurl
 
 from pcs.common import file_type_codes, reports
-from pcs.common.cfgsync_dto import SyncConfigsDto
 from pcs.common.communication.const import (
     COM_STATUS_ERROR,
     COM_STATUS_SUCCESS,
@@ -20,7 +19,8 @@ from pcs.common.node_communicator import (
     RequestTarget,
     Response,
 )
-from pcs.lib.communication.cfgsync import (
+from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
+from pcs.lib.communication.pcs_cfgsync import (
     ConfigInfo,
     GetConfigs,
 )
@@ -64,7 +64,7 @@ def fixture_request_apiv1(node_label="NODE"):
     return Request(
         RequestTarget(node_label),
         RequestData(
-            "api/v1/cfgsync-get-configs/v1",
+            "api/v1/pcs-cfgsync-get-configs/v1",
             data=json.dumps({"cluster_name": "test"}),
         ),
     )
@@ -277,7 +277,7 @@ class GetConfigsApiv1ResponseProcessing(TestCase):
                 fixture.error(
                     reports.codes.NODE_COMMUNICATION_ERROR,
                     node="NODE",
-                    command="api/v1/cfgsync-get-configs/v1",
+                    command="api/v1/pcs-cfgsync-get-configs/v1",
                     reason="HTTP error: 500",
                     force_code=reports.codes.SKIP_OFFLINE_NODES,
                 )
@@ -373,7 +373,7 @@ class GetConfigsApiv1ResponseProcessing(TestCase):
                 fixture.error(
                     reports.codes.NODE_COMMUNICATION_COMMAND_UNSUCCESSFUL,
                     node="NODE",
-                    command="api/v1/cfgsync-get-configs/v1",
+                    command="api/v1/pcs-cfgsync-get-configs/v1",
                     reason="Some error",
                 )
             ]
@@ -759,7 +759,7 @@ class GetConfigsResponseProcessing(TestCase):
                 fixture.error(
                     reports.codes.NODE_COMMUNICATION_ERROR,
                     node="NODE-2",
-                    command="api/v1/cfgsync-get-configs/v1",
+                    command="api/v1/pcs-cfgsync-get-configs/v1",
                     reason="HTTP error: 500",
                     force_code=reports.codes.SKIP_OFFLINE_NODES,
                 )
