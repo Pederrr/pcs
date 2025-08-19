@@ -1515,45 +1515,17 @@ def cluster_report(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:  # 
     print_to_stderr(newoutput)
 
 
-def send_local_configs(
-    node_name_list: StringIterable,
-    clear_local_cluster_permissions: bool = False,
-    force: bool = False,
-) -> list[str]:
-    """
-    Commandline options:
-      * --request-timeout - timeout of HTTP requests
-    """
-    pcsd_data = {
-        "nodes": node_name_list,
-        "force": force,
-        "clear_local_cluster_permissions": clear_local_cluster_permissions,
-    }
-    err_msgs = []
-    output, retval = utils.run_pcsdcli("send_local_configs", pcsd_data)
-    if retval == 0 and output["status"] == "ok" and output["data"]:
-        try:
-            for node_name in node_name_list:
-                node_response = output["data"][node_name]
-                if node_response["status"] == "notauthorized":
-                    err_msgs.append(
-                        (
-                            "Unable to authenticate to {0}, try running 'pcs "
-                            "host auth {0}'"
-                        ).format(node_name)
-                    )
-                if node_response["status"] not in ["ok", "not_supported"]:
-                    err_msgs.append(
-                        "Unable to set pcsd configs on {0}".format(node_name)
-                    )
-        # pylint: disable=bare-except
-        except:  # noqa: E722
-            err_msgs.append("Unable to communicate with pcsd")
-    else:
-        err_msgs.append("Unable to set pcsd configs")
-    return err_msgs
-
-
+# TODO this should be implemented in multiple lib commands, and the cli should
+# only call these commands as needed
+# - lib command for checking auth, that returns not authorized nodes
+# - if any not authorized nodes
+#   - the cli asks for a username and pass
+#   - call lib command for authorizing hosts
+# - else:
+#   - call lib command to send the configs to other nodes
+#
+# This command itself is always run as root, see app.py (_non_root_run)
+# So we do not need to deal with the configs in .pcs for non-root run
 def cluster_auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:  # noqa: PLR0912
     """
     Options:
@@ -1564,7 +1536,6 @@ def cluster_auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:  
     """
     # pylint: disable=too-many-branches
     # pylint: disable=too-many-locals
-    del lib
     modifiers.ensure_only_supported(
         "--corosync_conf", "--request-timeout", "-u", "-p"
     )
@@ -1634,9 +1605,9 @@ def cluster_auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:  
         utils.auth_hosts(nodes_to_auth_data)
     else:
         print_to_stderr("Sending cluster config files to the nodes...")
-        msgs = send_local_configs(cluster_node_names, force=True)
-        for msg in msgs:
-            warn(msg)
+        lib.pcs_cfgsync.send_local_configs_to_cluster_nodes(
+            force_flags=[reports.codes.FORCE]
+        )
 
 
 def _parse_node_options(

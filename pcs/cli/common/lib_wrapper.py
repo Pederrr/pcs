@@ -14,6 +14,7 @@ from pcs.lib.commands import (
     dr,
     fencing_topology,
     node,
+    pcs_cfgsync,
     pcsd,
     qdevice,
     quorum,
@@ -329,6 +330,15 @@ def load_module(env, middleware_factory, name):  # noqa: PLR0911, PLR0912
                 "standby_unstandby_all": node.standby_unstandby_all,
                 "standby_unstandby_list": node.standby_unstandby_list,
                 "standby_unstandby_local": node.standby_unstandby_local,
+            },
+        )
+
+    if name == "pcs_cfgsync":
+        return bind_all(
+            env,
+            middleware.build(),
+            {
+                "send_local_configs_to_cluster_nodes": pcs_cfgsync.send_local_configs_to_cluster_nodes
             },
         )
 

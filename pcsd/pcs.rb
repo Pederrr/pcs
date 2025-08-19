@@ -1117,21 +1117,6 @@ def pcs_deauth(auth_user, host_names)
   return sync_successful, sync_failed_nodes, sync_responses, hosts_not_found
 end
 
-def send_local_configs_to_nodes(
-  auth_user, nodes, force=false, clear_local_permissions=false
-)
-  configs = Cfgsync::get_configs_local(true)
-  if clear_local_permissions
-    pcs_config = PCSConfig.new(configs[Cfgsync::PcsdSettings.name].text())
-    pcs_config.permissions_local = Permissions::PermissionsSet.new([])
-    configs[Cfgsync::PcsdSettings.name].text = pcs_config.text()
-  end
-  publisher = Cfgsync::ConfigPublisher.new(
-    auth_user, configs.values(), nodes, $cluster_name
-  )
-  return publisher.send(force)
-end
-
 def get_uid(username)
   return Etc.getpwnam(username).uid
 end

@@ -12,6 +12,10 @@ def local_auth_cmd(lib, argv, modifiers):
       * -p - password
       * --request-timeout - timeout for HTTP requests
     """
+    # TODO should only update the file in home .pcs
+    # TODO should not be run as root (uid 0) - it otherwise adds localhost into /var/lib
+    # only used when calling commands as "root" through call_local_pcsd
+    # will eventually not be needed when unix socket is used
     del lib
     modifiers.ensure_only_supported("-u", "-p", "--request-timeout")
     if len(argv) > 1:

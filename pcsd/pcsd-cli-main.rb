@@ -106,19 +106,6 @@ def pcsd_cli_main()
         return {}
       },
     },
-    'send_local_configs' => {
-      'only_superuser' => false,
-      'call' => lambda { |params, auth_user_|
-        send_local_configs_to_nodes(
-          # for a case when sending to a node which is being added to a cluster
-          # - the node doesn't have the config so it cannot check permissions
-          PCSAuth.getSuperuserAuth(),
-          params['nodes'] || [],
-          params['force'] || false,
-          params['clear_local_cluster_permissions'] || false
-        )
-      }
-    },
     'node_status' => {
       'only_superuser' => true,
       'call' => lambda { |params, auth_user_|

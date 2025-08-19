@@ -509,6 +509,7 @@ EXTRA_DIST		= \
 			  tools/command_env/config_http_files.py \
 			  tools/command_env/config_http_host.py \
 			  tools/command_env/config_http_pcmk.py \
+			  tools/command_env/config_http_pcs_cfgsync.py \
 			  tools/command_env/config_http.py \
 			  tools/command_env/config_http_sbd.py \
 			  tools/command_env/config_http_scsi.py \
