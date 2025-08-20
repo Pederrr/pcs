@@ -6,6 +6,7 @@ from pcs.cli.common import middleware
 from pcs.lib.commands import (
     acl,
     alert,
+    auth,
     booth,
     cib,
     cib_options,
@@ -142,6 +143,15 @@ def load_module(env, middleware_factory, name):  # noqa: PLR0911, PLR0912
                 "remove_recipient": alert.remove_recipient,
                 "get_all_alerts": alert.get_all_alerts,
                 "get_config_dto": alert.get_config_dto,
+            },
+        )
+
+    if name == "auth":
+        return bind_all(
+            env,
+            middleware.build(),
+            {
+                "auth_hosts_token_no_sync": auth.auth_hosts_token_no_sync,
             },
         )
 

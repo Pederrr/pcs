@@ -16,6 +16,7 @@ from pcs.cli.common.parse_args import (
     KeyValueParser,
     split_list_by_any_keywords,
 )
+from pcs.common.node_communicator import PcsKnownHost
 from pcs.common.str_tools import format_list
 
 
@@ -64,7 +65,6 @@ def auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
       * --token - auth token
       * --request-timeout - timeout for HTTP requests
     """
-    del lib
     modifiers.ensure_only_supported("-u", "-p", "--request-timeout", "--token")
     if not argv:
         raise CmdLineInputError("No host specified")
@@ -77,7 +77,11 @@ def auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         token_value = utils.get_token_from_file(str(token))
         for host_info in host_dict.values():
             host_info.update(dict(token=token_value))
-        utils.auth_hosts_token(host_dict)
+        hosts = [
+            PcsKnownHost.from_known_host_file_dict(name, host_info)
+            for name, host_info in host_dict.items()
+        ]
+        lib.auth.auth_hosts_token_no_sync(hosts)
         return
     username, password = utils.get_user_and_pass()
     for host_info in host_dict.values():

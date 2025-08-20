@@ -307,6 +307,7 @@ EXTRA_DIST		= \
 			  tier0/lib/commands/tag/test_tag_update.py \
 			  tier0/lib/commands/test_acl.py \
 			  tier0/lib/commands/test_alert.py \
+			  tier0/lib/commands/test_auth.py \
 			  tier0/lib/commands/test_booth.py \
 			  tier0/lib/commands/test_cib_options.py \
 			  tier0/lib/commands/test_cib.py \

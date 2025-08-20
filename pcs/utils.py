@@ -974,17 +974,6 @@ def run_pcsdcli(command, data=None):
     return output_json, retval
 
 
-def auth_hosts_token(host_dict):
-    output, retval = run_pcsdcli("auth_with_token", dict(nodes=host_dict))
-    if retval == 0:
-        if output["status"] == "access_denied":
-            err("Access denied")
-        if output["status"] != "ok":
-            err("Unable to communicate with pcsd")
-    else:
-        err("Unable to communicate with pcsd")
-
-
 def auth_hosts(host_dict):
     """
     Commandline options:
@@ -1205,7 +1194,11 @@ def dom_elem_get_clone_ms_resource(clone_ms):
     for child in clone_ms.childNodes:
         if (
             child.nodeType == xml.dom.minidom.Node.ELEMENT_NODE
-            and child.tagName in ["group", "primitive"]
+            and child.tagName
+            in [
+                "group",
+                "primitive",
+            ]
         ):
             return child
     return None

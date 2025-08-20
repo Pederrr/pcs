@@ -318,6 +318,7 @@ EXTRA_DIST		= \
 			  lib/cluster_property.py \
 			  lib/commands/acl.py \
 			  lib/commands/alert.py \
+			  lib/commands/auth.py \
 			  lib/commands/booth.py \
 			  lib/commands/cib.py \
 			  lib/commands/cib_options.py \

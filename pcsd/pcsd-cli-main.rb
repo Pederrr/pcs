@@ -99,13 +99,6 @@ def pcsd_cli_main()
         }
       },
     },
-    'auth_with_token' => {
-      'only_superuser' => false,
-      'call' => lambda { |params, auth_user_|
-        pcs_auth_token(params.fetch('nodes'))
-        return {}
-      },
-    },
     'node_status' => {
       'only_superuser' => true,
       'call' => lambda { |params, auth_user_|
