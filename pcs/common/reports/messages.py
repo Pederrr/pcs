@@ -8506,3 +8506,29 @@ class NodeReportsUnexpectedClusterName(ReportItemMessage):
     @property
     def message(self) -> str:
         return f"The node is not in the cluster named '{self.cluster_name}'"
+
+
+@dataclass(frozen=True)
+class PcsCfgsyncConfigRejected(ReportItemMessage):
+    """
+    The synced config was rejected, because there is newer version of the file
+    in the cluster
+
+    file_type_code -- file_type
+    node_name_list -- list of node names on which the config was rejected
+    """
+
+    file_type_code: file_type_codes.FileTypeCode
+    node_name_list: list[str]
+    _code = codes.PCS_CFGSYNC_CONFIG_REJECTED
+
+    @property
+    def message(self) -> str:
+        return (
+            "The {file_role} file was was not saved on {nodes} {node_list} "
+            "because the file is present in a newer version there."
+        ).format(
+            file_role=format_file_role(self.file_type_code),
+            nodes=format_plural(self.node_name_list, "node"),
+            node_list=format_list(self.node_name_list),
+        )

@@ -415,9 +415,9 @@ class SendLocalConfigsToClusterNodes(TestCase):
         self.env_assist.assert_reports(
             [
                 fixture.error(
-                    reports.codes.NODE_REPORTS_UNEXPECTED_CLUSTER_NAME,
-                    cluster_name="test99",
-                    context=reports.dto.ReportItemContextDto(node="NODE-1"),
+                    reports.codes.PCS_CFGSYNC_CONFIG_REJECTED,
+                    file_type_code=PCS_KNOWN_HOSTS,
+                    node_name_list=["NODE-1"],
                 )
             ]
         )

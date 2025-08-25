@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from pcs.common import reports
 from pcs.common.file import RawFileError
 from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
@@ -90,10 +92,19 @@ def send_local_configs_to_cluster_nodes(
     com_cmd.set_targets(target_list)  # type: ignore [no-untyped-call]
     result = run_and_raise(node_communicator, com_cmd)  # type: ignore [no-untyped-call]
 
-    # TODO check the result and report stuff
-    # if some status is rejected, then report
+    # If some file was rejected, then report to the user
+    rejected_files = defaultdict(list)
     for node_name in result:
-        for cfg_filetype_code, cfg_result in result[node_name].items():
+        for cfg_file_type_code, cfg_result in result[node_name].items():
             if cfg_result == SetConfigsResult.REJECTED:
-                # TODO some report
-                print(cfg_filetype_code)
+                rejected_files[cfg_file_type_code].append(node_name)
+    for file_type_code in sorted(rejected_files.keys()):
+        env.report_processor.report(
+            reports.ReportItem.error(
+                reports.messages.PcsCfgsyncConfigRejected(
+                    file_type_code, rejected_files[file_type_code]
+                )
+            )
+        )
+    if env.report_processor.has_errors:
+        raise LibraryError()
