@@ -846,6 +846,38 @@ class ValueNotEmpty(ValuePredicateBase):
         return self._value_desc_or_enum
 
 
+class ValueNotEmptyNotNone(ValuePredicateBase):
+    """
+    Report INVALID_OPTION_VALUE when a value is empty or None
+    """
+
+    def __init__(
+        self,
+        option_name: TypeOptionName,
+        # TODO Set proper type. ReportItemMessage must be fixed as well.
+        value_desc_or_enum: Any,
+        option_name_for_report: Optional[str] = None,
+        severity: Optional[ReportItemSeverity] = None,
+    ):
+        """
+        value_desc_or_enum -- a list or a description of possible values
+        severity -- severity of produced reports, defaults to error
+        """
+        super().__init__(
+            option_name,
+            option_name_for_report=option_name_for_report,
+            severity=severity,
+        )
+        self._value_desc_or_enum = value_desc_or_enum
+        self._value_cannot_be_empty = True
+
+    def _is_valid(self, value: TypeOptionValue) -> bool:
+        return value is not None and not is_empty_string(value)
+
+    def _get_allowed_values(self) -> Any:
+        return self._value_desc_or_enum
+
+
 class ValuePcmkBoolean(ValuePredicateBase):
     """
     Report INVALID_OPTION_VALUE when the value is not a pacemaker boolean value
