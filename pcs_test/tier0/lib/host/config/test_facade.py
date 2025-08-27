@@ -93,3 +93,9 @@ class Facade(TestCase):
             },
             facade.known_hosts,
         )
+
+    def test_set_version(self):
+        facade = self._FIXTURE_FACADE
+        self.assertEqual(facade.data_version, 10)
+        facade.set_data_version(1000)
+        self.assertEqual(facade.data_version, 1000)
