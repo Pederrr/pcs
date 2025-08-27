@@ -1,6 +1,5 @@
-from typing import Any, Mapping, Sequence, Union, cast
-
-from dacite import from_dict
+from dataclasses import asdict
+from typing import Mapping, Sequence, cast
 
 from pcs.common import reports
 from pcs.common.file import RawFileError
@@ -18,63 +17,66 @@ from pcs.lib.node import get_existing_nodes_names
 from pcs.lib.pcs_cfgsync.save_sync import save_sync_new_known_hosts
 
 
-# TODO update this whole mess
-def _validate_hosts_with_token(
-    hosts_dict: Mapping[str, Any],
+def _validate_destinations(
+    host_name: str, destinations: Sequence[Destination]
 ) -> reports.ReportItemList:
     report_list = []
-    # TODO update the TODOs
-    for host_name in hosts_dict:
-        report_list.extend(
-            validate.ValueNotEmptyNotNone("host name", "").validate(
-                {"host name": host_name}
+    if not destinations:
+        report_list.append(
+            reports.ReportItem.error(
+                reports.messages.InvalidOptionValue(
+                    "dest_list",
+                    str(destinations),
+                    f"non-empty list of destinations for node '{host_name}'",
+                    cannot_be_empty=True,
+                )
             )
         )
+    for dest in destinations:
+        report_list.extend(
+            validate.ValidatorAll(
+                [
+                    validate.ValueNotEmpty(
+                        "addr", f"address for node '{host_name}'"
+                    ),
+                    validate.ValuePortNumber(
+                        "port", f"port for node '{host_name}'"
+                    ),
+                ]
+            ).validate(asdict(dest))
+        )
+
+    return report_list
+
+
+def _validate_hosts_with_token(
+    hosts: Sequence[PcsKnownHost],
+) -> reports.ReportItemList:
+    report_list = []
+    if not hosts:
+        report_list.append(
+            reports.ReportItem.error(reports.messages.NoHostSpecified())
+        )
+    for host in hosts:
         report_list.extend(
             # - TODO - should we also check the upper bound of the token length ?
             #    - TODO - the tokens from --token are base64 encoded
             validate.ValidatorAll(
                 [
-                    validate.IsRequiredAll(["dest_list", "token"], "host"),
-                    validate.ValueNotEmptyNotNone(
-                        "token", f"non-empty string for node '{host_name}'"
+                    validate.ValueNotEmpty("name", "node name"),
+                    validate.ValueNotEmpty(
+                        "token", f"non-empty string for node '{host.name}'"
                     ),
                 ]
-            ).validate(hosts_dict[host_name])
+            ).validate(asdict(host))
         )
-        dest_list = hosts_dict[host_name].get("dest_list", [])
-        if not dest_list:
-            report_list.append(
-                reports.ReportItem.error(
-                    reports.messages.InvalidOptionValue(
-                        "dest_list",
-                        dest_list,
-                        "non-empty list of destinations",
-                        cannot_be_empty=True,
-                    )
-                )
-            )
-        for dest in dest_list:
-            report_list.extend(
-                validate.ValidatorAll(
-                    [
-                        validate.IsRequiredAll(
-                            ["addr", "port"], option_type="dest_list"
-                        ),
-                        validate.ValueNotEmptyNotNone(
-                            "addr", f"address for node '{host_name}'"
-                        ),
-                        validate.ValuePortNumber(
-                            "port", f"port for node '{host_name}'"
-                        ),
-                    ]
-                ).validate(dest)
-            )
+        report_list.extend(_validate_destinations(host.name, host.dest_list))
+
     return report_list
 
 
 def _validate_hosts(
-    hosts: Mapping[str, Sequence[Mapping[str, Union[str, int]]]],
+    hosts: Mapping[str, Sequence[Destination]],
 ) -> reports.ReportItemList:
     report_list = []
     if not hosts:
@@ -83,59 +85,30 @@ def _validate_hosts(
         )
     for host_name in hosts:
         report_list.extend(
-            validate.ValueNotEmptyNotNone("host name", "").validate(
+            validate.ValueNotEmpty("host name", "").validate(
                 {"host name": host_name}
             )
         )
 
-        dest_list = hosts[host_name]
-        if not isinstance(dest_list, list) or not dest_list:
-            report_list.append(
-                reports.ReportItem.error(
-                    reports.messages.InvalidOptionValue(
-                        "dest_list",
-                        str(dest_list),
-                        "non-empty list of destinations",
-                        cannot_be_empty=True,
-                    )
-                )
-            )
-        for destination in dest_list:
-            report_list.extend(
-                validate.ValidatorAll(
-                    [
-                        validate.IsRequiredAll(
-                            ["addr", "port"], option_type="dest_list"
-                        ),
-                        validate.ValueNotEmptyNotNone(
-                            "addr", f"address for node '{host_name}'"
-                        ),
-                        validate.ValuePortNumber(
-                            "port", f"port for node '{host_name}'"
-                        ),
-                    ]
-                ).validate(destination)
-            )
+        report_list.extend(_validate_destinations(host_name, hosts[host_name]))
 
     return report_list
 
 
+# we can use dataclasses as arguments, apiv2 supports it:
+# - daemon.async_tasks.worker.executor -> the typehints from the command
+# are used to translate and validate the arguments
 def auth_hosts_token_no_sync(
-    env: LibraryEnvironment,
-    hosts_dict: Mapping[str, Any],  # TODO types
+    env: LibraryEnvironment, hosts: Sequence[PcsKnownHost]
 ) -> None:
     """
     TODO
     """
     if env.report_processor.report_list(
-        _validate_hosts_with_token(hosts_dict)
+        _validate_hosts_with_token(hosts)
     ).has_errors:
         raise LibraryError()
-
-    hosts = [
-        PcsKnownHost.from_known_host_file_dict(name, value)
-        for name, value in hosts_dict.items()
-    ]
+    # TODO check that there are no duplicities in host names
 
     file_instance = FileInstance.for_known_hosts()
     known_hosts_exists = file_instance.raw_file.exists()
@@ -171,16 +144,16 @@ def auth_hosts(
     env: LibraryEnvironment,
     username: str,
     password: str,
-    hosts: Mapping[str, Sequence[Mapping[str, Union[str, int]]]],
+    hosts: Mapping[str, Sequence[Destination]],
 ) -> None:
+    """
+    TODO
+    """
     if env.report_processor.report_list(_validate_hosts(hosts)).has_errors:
         raise LibraryError()
 
     request_targets = [
-        RequestTarget(
-            label=host_name,
-            dest_list=[from_dict(Destination, dest) for dest in destinations],
-        )
+        RequestTarget(label=host_name, dest_list=list(destinations))
         for host_name, destinations in hosts.items()
     ]
 
