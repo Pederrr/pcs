@@ -8532,3 +8532,29 @@ class PcsCfgsyncConfigRejected(ReportItemMessage):
             nodes=format_plural(self.node_name_list, "node"),
             node_list=format_list(self.node_name_list),
         )
+
+
+@dataclass(frozen=True)
+class AuthorizationSuccessful(ReportItemMessage):
+    """
+    Successfully authorized
+    """
+
+    _code = codes.AUTHORIZATION_SUCCESSFUL
+
+    @property
+    def message(self) -> str:
+        return "Authorized"
+
+
+@dataclass(frozen=True)
+class IncorrectCredentials(ReportItemMessage):
+    """
+    The username and/or password provided by user are incorrect
+    """
+
+    _code = codes.INCORRECT_CREDENTIALS
+
+    @property
+    def message(self) -> str:
+        return "Username and/or password is incorrect"

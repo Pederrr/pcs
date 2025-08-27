@@ -1,7 +1,7 @@
 import json
 
 from pcs.common import reports
-from pcs.common.node_communicator import RequestData
+from pcs.common.node_communicator import RequestData, Response
 from pcs.common.reports import ReportItemSeverity
 from pcs.common.reports import codes as report_codes
 from pcs.common.reports.item import ReportItem
@@ -108,6 +108,51 @@ class CheckAuth(AllSameDataMixin, AllAtOnceStrategyMixin, RunRemotelyBase):
 
     def on_complete(self):
         return self._not_authorized_host_name_list
+
+
+class Auth(AllSameDataMixin, AllAtOnceStrategyMixin, RunRemotelyBase):
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        report_processor: reports.ReportProcessor,
+    ) -> None:
+        super().__init__(report_processor)
+        self._username = username
+        self._password = password
+        self._tokens: dict[str, str] = {}
+
+    def _get_request_data(self):
+        return RequestData(
+            "remote/auth",
+            [("username", self._username), ("password", self._password)],
+        )
+
+    def _process_response(self, response: Response):
+        report = response_to_report_item(response)
+        if report:
+            self._report(report)
+            return
+
+        node_label = response.request.target.label
+        context = reports.ReportItemContext(node_label)
+        token = response.data.strip()
+        if token:
+            self._tokens[node_label] = token
+            self._report(
+                reports.ReportItem.info(
+                    reports.messages.AuthorizationSuccessful(), context=context
+                )
+            )
+        else:
+            self._report(
+                reports.ReportItem.error(
+                    reports.messages.IncorrectCredentials(), context=context
+                )
+            )
+
+    def on_complete(self) -> dict[str, str]:
+        return self._tokens
 
 
 class GetHostInfo(AllSameDataMixin, AllAtOnceStrategyMixin, RunRemotelyBase):

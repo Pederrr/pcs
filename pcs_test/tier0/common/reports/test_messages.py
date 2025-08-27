@@ -6332,3 +6332,18 @@ class NodeReportsUnexpectedClusterName(NameBuildTest):
             "The node is not in the cluster named 'name'",
             reports.NodeReportsUnexpectedClusterName("name"),
         )
+
+
+class AuthorizationSuccessful(NameBuildTest):
+    def test_success(self):
+        self.assert_message_from_report(
+            "Authorized", reports.AuthorizationSuccessful()
+        )
+
+
+class IncorrectCredentials(NameBuildTest):
+    def test_success(self):
+        self.assert_message_from_report(
+            "Username and/or password is incorrect",
+            reports.IncorrectCredentials(),
+        )
