@@ -8558,3 +8558,16 @@ class IncorrectCredentials(ReportItemMessage):
     @property
     def message(self) -> str:
         return "Username and/or password is incorrect"
+
+
+@dataclass(frozen=True)
+class NoHostSpecified(ReportItemMessage):
+    """
+    No hosts were specified
+    """
+
+    _code = codes.NO_HOST_SPECIFIED
+
+    @property
+    def message(self) -> str:
+        return "No host specified"

@@ -77,6 +77,10 @@ def _validate_hosts(
     hosts: Mapping[str, Sequence[Mapping[str, Union[str, int]]]],
 ) -> reports.ReportItemList:
     report_list = []
+    if not hosts:
+        report_list.append(
+            reports.ReportItem.error(reports.messages.NoHostSpecified())
+        )
     for host_name in hosts:
         report_list.extend(
             validate.ValueNotEmptyNotNone("host name", "").validate(
@@ -183,6 +187,10 @@ def auth_hosts(
     node_communicator = env.get_node_communicator()
     com_cmd = Auth(username, password, env.report_processor)
     com_cmd.set_targets(request_targets)
+    # we do not want to raise LibraryError in case only some nodes returned
+    # errors, since we want to update the known-hosts file with whatever tokens
+    # we were able to receive - this is how the old impl behaved
+    # this means we cannot blindly check errors by using processor.has_errors
     received_tokens: dict[str, str] = run(node_communicator, com_cmd)
 
     new_known_hosts = [
@@ -194,6 +202,11 @@ def auth_hosts(
         for target in request_targets
         if target.label in received_tokens
     ]
+
+    if not new_known_hosts:
+        if env.report_processor.has_errors:
+            raise LibraryError()
+        return
 
     if FileInstance.for_corosync_conf().raw_file.exists():
         # we are in cluster, so we distribute the new tokens
