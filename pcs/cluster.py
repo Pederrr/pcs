@@ -1590,19 +1590,15 @@ def cluster_auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:  
                             "authenticate the node"
                         )
         nodes_to_auth_data = {
-            node.name: dict(
-                username=username,
-                password=password,
-                dest_list=[
-                    dict(
-                        addr=node.addrs_plain()[0],
-                        port=settings.pcsd_default_port,
-                    )
-                ],
-            )
+            node.name: [
+                dict(
+                    addr=node.addrs_plain()[0],
+                    port=settings.pcsd_default_port,
+                )
+            ]
             for node in not_auth_node_list
         }
-        utils.auth_hosts(nodes_to_auth_data)
+        lib.auth.auth_hosts(username, password, nodes_to_auth_data)
     else:
         print_to_stderr("Sending cluster config files to the nodes...")
         lib.pcs_cfgsync.send_local_configs_to_cluster_nodes(
