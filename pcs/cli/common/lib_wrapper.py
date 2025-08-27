@@ -151,6 +151,7 @@ def load_module(env, middleware_factory, name):  # noqa: PLR0911, PLR0912
             env,
             middleware.build(),
             {
+                "auth_hosts": auth.auth_hosts,
                 "auth_hosts_token_no_sync": auth.auth_hosts_token_no_sync,
             },
         )

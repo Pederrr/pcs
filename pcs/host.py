@@ -76,13 +76,18 @@ def auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         token_value = utils.get_token_from_file(str(token))
         for host_info in host_dict.values():
             host_info.update(dict(token=token_value))
-        host_info["dest_list"] = []
         lib.auth.auth_hosts_token_no_sync(host_dict)
         return
+
     username, password = utils.get_user_and_pass()
-    for host_info in host_dict.values():
-        host_info.update(dict(username=username, password=password))
-    utils.auth_hosts(host_dict)
+    lib.auth.auth_hosts(
+        username,
+        password,
+        {
+            host_name: host_dict[host_name]["dest_list"]
+            for host_name in host_dict
+        },
+    )
 
 
 def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:

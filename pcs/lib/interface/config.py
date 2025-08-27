@@ -81,3 +81,9 @@ class SyncVersionFacadeInterface(FacadeInterface):
         Get data version of the underlying config file
         """
         raise NotImplementedError()
+
+    def set_data_version(self, new_version: int) -> int:
+        """
+        Set data version of the underlying config file
+        """
+        raise NotImplementedError()
