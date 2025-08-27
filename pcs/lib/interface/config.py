@@ -82,7 +82,7 @@ class SyncVersionFacadeInterface(FacadeInterface):
         """
         raise NotImplementedError()
 
-    def set_data_version(self, new_version: int) -> int:
+    def set_data_version(self, new_version: int) -> None:
         """
         Set data version of the underlying config file
         """

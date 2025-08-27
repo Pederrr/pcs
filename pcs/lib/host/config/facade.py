@@ -25,8 +25,8 @@ class Facade(SyncVersionFacadeInterface):
     def data_version(self) -> int:
         return self.config.data_version
 
-    def set_data_version(self, data_version: int) -> None:
-        self._set_config(replace(self.config, data_version=data_version))
+    def set_data_version(self, new_version: int) -> None:
+        self._set_config(replace(self.config, data_version=new_version))
 
     @property
     def known_hosts(self) -> dict[str, PcsKnownHost]:
