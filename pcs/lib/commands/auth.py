@@ -225,6 +225,7 @@ def auth_hosts(
         if not no_conflict:
             # TODO report ?
             raise LibraryError()
+        return
 
     # we are not running in a cluster, so just save the new tokens locally
     # TODO copy-pasted code from command above
