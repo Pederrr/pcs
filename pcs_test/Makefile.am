@@ -192,6 +192,7 @@ EXTRA_DIST		= \
 			  tier0/lib/auth/config/test_facade.py \
 			  tier0/lib/auth/config/test_parser.py \
 			  tier0/lib/auth/test_provider.py \
+			  tier0/lib/auth/test_validations.py \
 			  tier0/lib/booth/__init__.py \
 			  tier0/lib/booth/test_cib.py \
 			  tier0/lib/booth/test_config_facade.py \

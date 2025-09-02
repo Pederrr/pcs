@@ -1,8 +1,4 @@
-from typing import (
-    Any,
-    Optional,
-    Union,
-)
+from typing import Any
 from urllib.parse import urlparse
 
 from pcs import (
@@ -16,12 +12,12 @@ from pcs.cli.common.parse_args import (
     KeyValueParser,
     split_list_by_any_keywords,
 )
+from pcs.common.auth import HostAuthData, HostWithTokenAuthData
+from pcs.common.host import Destination
 from pcs.common.str_tools import format_list
 
 
-def _parse_host_options(
-    host: str, options: Argv
-) -> dict[str, Union[str, list[dict[str, Union[None, str, int]]]]]:
+def _parse_host_options(host: str, options: Argv) -> list[Destination]:
     ADDR_OPT_KEYWORD = "addr"  # pylint: disable=invalid-name
     supported_options = {ADDR_OPT_KEYWORD}
     parsed_options = KeyValueParser(options).get_unique()
@@ -30,11 +26,11 @@ def _parse_host_options(
         raise CmdLineInputError(
             f"Unknown options {format_list(unknown_options)} for host '{host}'"
         )
-    addr, port = _parse_addr(parsed_options.get(ADDR_OPT_KEYWORD, host))
-    return {"dest_list": [dict(addr=addr, port=port)]}
+    destination = _parse_addr(parsed_options.get(ADDR_OPT_KEYWORD, host))
+    return [destination]
 
 
-def _parse_addr(addr: str) -> tuple[Optional[str], int]:
+def _parse_addr(addr: str) -> Destination:
     if addr.count(":") > 1 and not addr.startswith("["):
         # if IPv6 without port put it in parentheses
         addr = f"[{addr}]"
@@ -53,7 +49,10 @@ def _parse_addr(addr: str) -> tuple[Optional[str], int]:
     # urlparse allow 0 as valid port number, pcs does not
     if port == 0:
         raise common_exception
-    return url.hostname, (port if port else settings.pcsd_default_port)
+    return Destination(
+        addr=url.hostname or "",
+        port=port if port else settings.pcsd_default_port,
+    )
 
 
 def auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
@@ -74,19 +73,20 @@ def auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
     token = modifiers.get("--token")
     if token:
         token_value = utils.get_token_from_file(str(token))
-        for host_info in host_dict.values():
-            host_info.update(dict(token=token_value))
-        lib.auth.auth_hosts_token_no_sync(host_dict)
+        lib.auth.auth_hosts_token_no_sync(
+            {
+                host_name: HostWithTokenAuthData(token_value, dest_list)
+                for host_name, dest_list in host_dict.items()
+            }
+        )
         return
 
     username, password = utils.get_user_and_pass()
     lib.auth.auth_hosts(
-        username,
-        password,
         {
-            host_name: host_dict[host_name]["dest_list"]
-            for host_name in host_dict
-        },
+            host_name: HostAuthData(username, password, dest_list)
+            for host_name, dest_list in host_dict.items()
+        }
     )
 
 

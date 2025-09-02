@@ -119,6 +119,7 @@ EXTRA_DIST		= \
 			  cli/tag/command.py \
 			  cli/tag/output.py \
 			  cluster.py \
+			  common/auth.py \
 			  common/corosync_conf.py \
 			  common/const.py \
 			  common/dr.py \
@@ -259,6 +260,7 @@ EXTRA_DIST		= \
 			  lib/auth/provider.py \
 			  lib/auth/tools.py \
 			  lib/auth/types.py \
+			  lib/auth/validations.py \
 			  lib/booth/cib.py \
 			  lib/booth/config_facade.py \
 			  lib/booth/config_files.py \

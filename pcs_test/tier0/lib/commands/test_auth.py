@@ -2,6 +2,7 @@ from unittest import TestCase
 
 from pcs import settings
 from pcs.common import reports
+from pcs.common.auth import HostWithTokenAuthData
 from pcs.common.file_type_codes import PCS_KNOWN_HOSTS
 from pcs.common.host import Destination, PcsKnownHost
 from pcs.lib.commands import auth
@@ -9,7 +10,6 @@ from pcs.lib.host.config.exporter import Exporter as KnownHostsExporter
 from pcs.lib.host.config.types import KnownHosts
 
 from pcs_test.tools import fixture
-from pcs_test.tools.assertions import assert_report_item_list_equal
 from pcs_test.tools.command_env import get_env_tools
 
 
@@ -29,127 +29,11 @@ _FIXTURE_KNOWN_HOSTS = {
 }
 
 
-class ValidateHostsWithToken(TestCase):
-    def test_valid_no_reports(self):
-        report_list = auth._validate_hosts_with_token(
-            {
-                "node1": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-                "node2": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-            }
-        )
-        assert_report_item_list_equal(report_list, [])
-
-    def test_invalid_name(self):
-        report_list = auth._validate_hosts_with_token(
-            {
-                "node1": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-                "": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-            }
-        )
-        assert_report_item_list_equal(
-            report_list,
-            [
-                fixture.error(
-                    reports.codes.INVALID_OPTION_VALUE,
-                    option_name="host name",
-                    option_value="",
-                    allowed_values="",
-                    cannot_be_empty=True,
-                    forbidden_characters=None,
-                )
-            ],
-        )
-
-    def test_missing_token(self):
-        report_list = auth._validate_hosts_with_token(
-            {
-                "node1": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-                "node2": {
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-            }
-        )
-        assert_report_item_list_equal(report_list, [])
-
-    def test_empty_token(self):
-        report_list = auth._validate_hosts_with_token(
-            {
-                "node1": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-                "node2": {
-                    "token": "",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-            }
-        )
-        assert_report_item_list_equal(
-            report_list,
-            [
-                fixture.error(
-                    reports.codes.INVALID_OPTION_VALUE,
-                    option_name="token",
-                    option_value="",
-                    allowed_values="",
-                    cannot_be_empty=True,
-                    forbidden_characters=None,
-                )
-            ],
-        )
-
-    def test_missing_dest_list(self):
-        report_list = auth._validate_hosts_with_token(
-            {
-                "node1": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-                "node2": {
-                    "token": "TOKEN",
-                },
-            }
-        )
-        assert_report_item_list_equal(report_list, [])
-
-    def test_empty_dest_list(self):
-        report_list = auth._validate_hosts_with_token(
-            {
-                "node1": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node1", "port": 2224}],
-                },
-                "node2": {
-                    "token": "TOKEN",
-                    "dest_list": [],
-                },
-            }
-        )
-        assert_report_item_list_equal(report_list, [])
-
-    # TODO
-
-
 class AuthHostsTokenNoSync(TestCase):
     def setUp(self):
         self.env_assist, self.config = get_env_tools(self)
 
-    def test_adds_new_host(self):
+    def test_adds_new(self):
         self.config.raw_file.exists(
             PCS_KNOWN_HOSTS, settings.pcsd_known_hosts_location
         )
@@ -168,6 +52,9 @@ class AuthHostsTokenNoSync(TestCase):
                     "node3": PcsKnownHost(
                         "node3", "TOKEN", [Destination("node3", 2224)]
                     ),
+                    "node4": PcsKnownHost(
+                        "node4", "TOKEN", [Destination("node4", 2224)]
+                    ),
                 },
             ),
             can_overwrite=True,
@@ -176,14 +63,16 @@ class AuthHostsTokenNoSync(TestCase):
         auth.auth_hosts_token_no_sync(
             self.env_assist.get_env(),
             {
-                "node3": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node3", "port": 2224}],
-                }
+                "node3": HostWithTokenAuthData(
+                    "TOKEN", [Destination("node3", 2224)]
+                ),
+                "node4": HostWithTokenAuthData(
+                    "TOKEN", [Destination("node4", 2224)]
+                ),
             },
         )
 
-    def test_rewrites_existing_host(self):
+    def test_adds_new_rewrites_existing_host(self):
         self.config.raw_file.exists(
             PCS_KNOWN_HOSTS, settings.pcsd_known_hosts_location
         )
@@ -202,6 +91,9 @@ class AuthHostsTokenNoSync(TestCase):
                     "node2": PcsKnownHost(
                         "node2", "TOKEN", [Destination("node22", 8080)]
                     ),
+                    "node3": PcsKnownHost(
+                        "node3", "TOKEN", [Destination("node3", 2224)]
+                    ),
                 },
             ),
             can_overwrite=True,
@@ -210,17 +102,38 @@ class AuthHostsTokenNoSync(TestCase):
         auth.auth_hosts_token_no_sync(
             self.env_assist.get_env(),
             {
-                "node2": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node22", "port": 8080}],
-                }
+                "node2": HostWithTokenAuthData(
+                    "TOKEN", [Destination("node22", 8080)]
+                ),
+                "node3": HostWithTokenAuthData(
+                    "TOKEN", [Destination("node3", 2224)]
+                ),
             },
         )
 
-    def test_invalid_known_hosts(self):
-        # TODO - invalid token
-        # TODO - invalid dest_list
-        pass
+    def test_invalid_data_empty_token(self):
+        self.env_assist.assert_raise_library_error(
+            lambda: auth.auth_hosts_token_no_sync(
+                self.env_assist.get_env(),
+                {
+                    "node2": HostWithTokenAuthData(
+                        "", [Destination("node2", 2224)]
+                    )
+                },
+            )
+        )
+        self.env_assist.assert_reports(
+            [
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_name="token",
+                    option_value="",
+                    allowed_values="non-empty string for node 'node2'",
+                    cannot_be_empty=True,
+                    forbidden_characters=None,
+                )
+            ]
+        )
 
     def test_file_not_existed_before(self):
         self.config.raw_file.exists(
@@ -243,10 +156,9 @@ class AuthHostsTokenNoSync(TestCase):
         auth.auth_hosts_token_no_sync(
             self.env_assist.get_env(),
             {
-                "node2": {
-                    "token": "TOKEN",
-                    "dest_list": [{"addr": "node2", "port": 2224}],
-                }
+                "node2": HostWithTokenAuthData(
+                    "TOKEN", [Destination("node2", 2224)]
+                )
             },
         )
 
@@ -261,7 +173,14 @@ class AuthHostsTokenNoSync(TestCase):
         )
 
         self.env_assist.assert_raise_library_error(
-            lambda: auth.auth_hosts_token_no_sync(self.env_assist.get_env(), {})
+            lambda: auth.auth_hosts_token_no_sync(
+                self.env_assist.get_env(),
+                {
+                    "node2": HostWithTokenAuthData(
+                        "TOKEN", [Destination("node2", 2224)]
+                    )
+                },
+            )
         )
         self.env_assist.assert_reports(
             [
@@ -284,7 +203,14 @@ class AuthHostsTokenNoSync(TestCase):
         )
 
         self.env_assist.assert_raise_library_error(
-            lambda: auth.auth_hosts_token_no_sync(self.env_assist.get_env(), {})
+            lambda: auth.auth_hosts_token_no_sync(
+                self.env_assist.get_env(),
+                {
+                    "node2": HostWithTokenAuthData(
+                        "TOKEN", [Destination("node2", 2224)]
+                    )
+                },
+            )
         )
         self.env_assist.assert_reports(
             [
@@ -331,10 +257,9 @@ class AuthHostsTokenNoSync(TestCase):
             lambda: auth.auth_hosts_token_no_sync(
                 self.env_assist.get_env(),
                 {
-                    "node3": {
-                        "token": "TOKEN",
-                        "dest_list": [{"addr": "node3", "port": 2224}],
-                    }
+                    "node3": HostWithTokenAuthData(
+                        "TOKEN", [Destination("node3", 2224)]
+                    )
                 },
             )
         )

@@ -33,7 +33,9 @@ from pcs.cli.reports.messages import report_item_msg_from_dto
 from pcs.cli.reports.output import deprecation_warning, warn
 from pcs.common import file as pcs_file
 from pcs.common import file_type_codes, reports
+from pcs.common.auth import HostAuthData
 from pcs.common.corosync_conf import CorosyncConfDto, CorosyncNodeDto
+from pcs.common.host import Destination
 from pcs.common.interface import dto
 from pcs.common.node_communicator import HostNotFound, Request, RequestData
 from pcs.common.str_tools import format_list, indent, join_multilines
@@ -1590,15 +1592,18 @@ def cluster_auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:  
                             "authenticate the node"
                         )
         nodes_to_auth_data = {
-            node.name: [
-                dict(
-                    addr=node.addrs_plain()[0],
-                    port=settings.pcsd_default_port,
-                )
-            ]
+            node.name: HostAuthData(
+                username,
+                password,
+                [
+                    Destination(
+                        node.addrs_plain()[0], settings.pcsd_default_port
+                    )
+                ],
+            )
             for node in not_auth_node_list
         }
-        lib.auth.auth_hosts(username, password, nodes_to_auth_data)
+        lib.auth.auth_hosts(nodes_to_auth_data)
     else:
         print_to_stderr("Sending cluster config files to the nodes...")
         lib.pcs_cfgsync.send_local_configs_to_cluster_nodes(

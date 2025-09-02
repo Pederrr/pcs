@@ -1,7 +1,14 @@
 import json
+from typing import Mapping
 
 from pcs.common import reports
-from pcs.common.node_communicator import RequestData, Response
+from pcs.common.auth import HostAuthData
+from pcs.common.node_communicator import (
+    Request,
+    RequestData,
+    RequestTarget,
+    Response,
+)
 from pcs.common.reports import ReportItemSeverity
 from pcs.common.reports import codes as report_codes
 from pcs.common.reports.item import ReportItem
@@ -110,23 +117,30 @@ class CheckAuth(AllSameDataMixin, AllAtOnceStrategyMixin, RunRemotelyBase):
         return self._not_authorized_host_name_list
 
 
-class Auth(AllSameDataMixin, AllAtOnceStrategyMixin, RunRemotelyBase):
+class Auth(AllAtOnceStrategyMixin, RunRemotelyBase):
     def __init__(
         self,
-        username: str,
-        password: str,
+        auth_data: Mapping[str, HostAuthData],
         report_processor: reports.ReportProcessor,
     ) -> None:
         super().__init__(report_processor)
-        self._username = username
-        self._password = password
+        self._auth_data = auth_data
         self._tokens: dict[str, str] = {}
 
-    def _get_request_data(self):
-        return RequestData(
-            "remote/auth",
-            [("username", self._username), ("password", self._password)],
-        )
+    def _prepare_initial_requests(self):
+        return [
+            Request(
+                RequestTarget(host_name, dest_list=auth_data.dest_list),
+                RequestData(
+                    action="remote/auth",
+                    structured_data=[
+                        ("username", auth_data.username),
+                        ("password", auth_data.password),
+                    ],
+                ),
+            )
+            for host_name, auth_data in self._auth_data.items()
+        ]
 
     def _process_response(self, response: Response):
         report = response_to_report_item(response)
