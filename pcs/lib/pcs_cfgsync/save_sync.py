@@ -43,19 +43,19 @@ def save_sync_new_version(
         results[node].get(PCS_KNOWN_HOSTS) == SetConfigsResult.ACCEPTED
         for node in results
     ):
-        # we were able to successfuly save the files on all cluster nodes
+        # we were able to successfully save the files on all cluster nodes
         return True
 
     if fetch_on_conflict:
         fetcher = ConfigFetcher(node_communicator, report_processor)
         newest_files, _ = fetcher.fetch(cluster_name, target_list)
-        print(newest_files)
 
         try:
-            file_instance.write_facade(
-                newest_files[file_instance.toolbox.file_type_code],
-                can_overwrite=True,
-            )
+            if file_instance.toolbox.file_type_code in newest_files:
+                file_instance.write_facade(
+                    newest_files[file_instance.toolbox.file_type_code],
+                    can_overwrite=True,
+                )
         except RawFileError as e:
             report_processor.report(raw_file_error_report(e))
 
@@ -81,11 +81,11 @@ def save_sync_new_known_hosts(
             )
     except RawFileError as e:
         report_processor.report(raw_file_error_report(e))
+        return False
     except ParserErrorException as e:
         report_processor.report_list(
             known_hosts_instance.parser_exception_to_report_list(e)
         )
-    if report_processor.has_errors:
         return False
 
     old_local_known_hosts = known_hosts_facade.config
@@ -109,7 +109,7 @@ def save_sync_new_known_hosts(
         results[node].get(PCS_KNOWN_HOSTS) == SetConfigsResult.ACCEPTED
         for node in results
     ):
-        # we were able to successfuly save the files on all cluster nodes
+        # we were able to successfully save the files on all cluster nodes
         return True
 
     # some nodes had newer configs

@@ -381,6 +381,7 @@ EXTRA_DIST		= \
 			  tier0/lib/pcs_cfgsync/config/test_facade.py \
 			  tier0/lib/pcs_cfgsync/__init__.py \
 			  tier0/lib/pcs_cfgsync/test_fetcher.py \
+			  tier0/lib/pcs_cfgsync/test_save_sync.py \
 			  tier0/lib/permissions/__init__.py \
 			  tier0/lib/permissions/config/__init__.py \
 			  tier0/lib/permissions/config/test_facade.py \
