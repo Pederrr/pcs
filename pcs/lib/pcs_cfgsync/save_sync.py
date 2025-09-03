@@ -112,6 +112,13 @@ def save_sync_new_known_hosts(
         # we were able to successfully save the files on all cluster nodes
         return True
 
+    if all(
+        results[node].get(PCS_KNOWN_HOSTS) == SetConfigsResult.ERROR
+        for node in results
+    ):
+        # TODO
+        return False
+
     # some nodes had newer configs
     # find the newest config from the cluster
     fetcher = ConfigFetcher(node_communicator, report_processor)
