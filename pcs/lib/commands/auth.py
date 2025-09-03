@@ -67,6 +67,8 @@ def auth_hosts(
     """
     TODO
     """
+    # TODO we want to raise LibraryError at the end, if there are any errors in processor
+    # maybe report warning that something was done even though the command raised
     if env.report_processor.report_list(
         validations.validate_hosts(hosts)
     ).has_errors:
@@ -107,12 +109,12 @@ def auth_hosts(
         env.report_processor.report_list(report_list)
         new_hosts_already_in_cluster = set(received_tokens) & set(node_names)
         target_list = env.get_node_target_factory().get_target_list(
-            set(node_names) - new_hosts_already_in_cluster
+            sorted(set(node_names) - new_hosts_already_in_cluster)
         )  # type: ignore [no-untyped-call]
         target_list.extend(
             RequestTarget.from_known_host(host)
             for host in new_known_hosts
-            if host.name in new_hosts_already_in_cluster
+            if host.name in sorted(new_hosts_already_in_cluster)
         )
 
         no_conflict = save_sync_new_known_hosts(
