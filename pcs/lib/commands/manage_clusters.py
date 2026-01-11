@@ -47,7 +47,7 @@ def add_existing_cluster(  # noqa: PLR0912, PLR0915
     if env.report_processor.has_errors:
         raise LibraryError()
 
-    if cluster_name == "":
+    if not cluster_name:
         env.report_processor.report(
             reports.ReportItem.error(
                 reports.messages.NodeNotInCluster(),
