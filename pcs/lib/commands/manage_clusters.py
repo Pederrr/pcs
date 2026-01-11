@@ -23,6 +23,17 @@ def add_existing_cluster(  # noqa: PLR0912, PLR0915
     env: LibraryEnvironment,
     node_name: str,
 ) -> None:
+    """
+    Add an existing cluster to the local pcs configuration for management.
+
+    Contact the specified node to discover cluster details and tokens needed
+    for communication with cluster nodes. Update the local pcs_settings and
+    known-hosts configuration files. If the local node is in a cluster,
+    synchronize the updated configuration files to local cluster nodes.
+
+    node_name -- name of a node from the cluster to be added
+    """
+
     node_communicator = env.get_node_communicator()
     remote_request_targets = env.get_node_target_factory().get_target_list(
         [node_name]
