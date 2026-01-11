@@ -225,7 +225,10 @@ class UnixSocketAuthProvider(ApiAuthProviderInterface):
             # treat root as cluster superuser
             return SUPERUSER
 
-        return pwd.getpwuid(uid).pw_name
+        try:
+            return pwd.getpwuid(uid).pw_name
+        except KeyError:
+            return None
 
     def is_available(self) -> bool:
         return self._is_unix_socket_used()
