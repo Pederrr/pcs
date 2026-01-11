@@ -135,6 +135,7 @@ class AuthProviderMulti(ApiAuthProviderInterface):
             # No providers available
             raise NotAuthorizedException()
 
+        assert self._first_available_provider is not None
         return await self._first_available_provider.auth_user()
 
 
