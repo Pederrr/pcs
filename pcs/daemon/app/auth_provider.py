@@ -212,3 +212,41 @@ class UnixSocketAuthProviderFactory(ApiAuthProviderFactoryInterface):
 
     def create(self, handler: RequestHandler) -> UnixSocketAuthProvider:
         return UnixSocketAuthProvider(handler, self._lib_auth_provider)
+
+
+class TokenAuthProvider(ApiAuthProviderInterface):
+    def __init__(
+        self, handler: RequestHandler, lib_auth_provider: AuthProvider
+    ) -> None:
+        self._handler = handler
+        self._lib_auth_provider = lib_auth_provider
+
+    @property
+    def _token(self) -> Optional[str]:
+        return self._handler.get_cookie("token")
+
+    def can_handle_request(self) -> bool:
+        return self._token is not None
+
+    async def auth_user(self) -> AuthUser:
+        if not self.can_handle_request():
+            raise NotAuthorizedException()
+
+        # tell mypy that token cannot be None here
+        token = self._token
+        assert token is not None
+        auth_user = await IOLoop.current().run_in_executor(
+            executor=None,
+            func=lambda: self._lib_auth_provider.auth_by_token(token),
+        )
+        if auth_user is None:
+            raise NotAuthorizedException()
+        return auth_user
+
+
+class TokenAuthProviderFactory(ApiAuthProviderFactoryInterface):
+    def __init__(self, lib_auth_provider: AuthProvider):
+        self._lib_auth_provider = lib_auth_provider
+
+    def create(self, handler: RequestHandler) -> TokenAuthProvider:
+        return TokenAuthProvider(handler, self._lib_auth_provider)

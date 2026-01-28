@@ -111,6 +111,7 @@ class PasswordAuthProvider(_BaseLibAuthProvider):
         return auth_user
 
 
+# DEPRECATED, use pcs.daemon.app.auth_provider.TokenAuthProvider
 class TokenAuthProvider(_BaseLibAuthProvider):
     async def auth_by_token(self) -> AuthUser:
         token = self.auth_token
