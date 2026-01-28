@@ -174,6 +174,7 @@ EXTRA_DIST		= \
 			  tier0/daemon/app/test_api_v0.py \
 			  tier0/daemon/app/test_api_v0_tools.py \
 			  tier0/daemon/app/test_api_v1.py \
+			  tier0/daemon/app/test_api_v2.py \
 			  tier0/daemon/app/test_app_auth.py \
 			  tier0/daemon/app/test_app_gui.py \
 			  tier0/daemon/app/test_app_redirect.py \
