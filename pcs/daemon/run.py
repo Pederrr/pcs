@@ -117,16 +117,34 @@ def configure_app(  # noqa: PLR0913
             reload its SSL certificates). A relevant handler should get this
             object via the method `initialize`.
         """
-        # Create common auth provider factories
         socket_auth_factory = auth_provider.UnixSocketAuthProviderFactory(
             lib_auth_provider
         )
         token_auth_factory = auth_provider.TokenAuthProviderFactory(
             lib_auth_provider
         )
-        api_v2_auth_factory = auth_provider.AuthProviderMultiFactory(
-            [token_auth_factory, socket_auth_factory]
-        )
+
+        if webui:
+            session_storage = webui.session.Storage(session_lifetime)
+            session_auth_factory = (
+                webui.auth_provider.SessionAuthProviderFactory(
+                    lib_auth_provider, session_storage
+                )
+            )
+
+            # WebUI present: we can use session authentication
+            ui_auth_factory = auth_provider.AuthProviderMultiFactory(
+                [session_auth_factory, socket_auth_factory]
+            )
+            api_v2_auth_factory = auth_provider.AuthProviderMultiFactory(
+                [session_auth_factory, token_auth_factory, socket_auth_factory]
+            )
+        else:
+            # No WebUI: no session authentication
+            ui_auth_factory = socket_auth_factory
+            api_v2_auth_factory = auth_provider.AuthProviderMultiFactory(
+                [token_auth_factory, socket_auth_factory]
+            )
 
         routes = api_v2.get_routes(api_v2_auth_factory, async_scheduler)
         routes.extend(api_v1.get_routes(async_scheduler, lib_auth_provider))
@@ -145,7 +163,6 @@ def configure_app(  # noqa: PLR0913
         )
 
         if webui:
-            session_storage = webui.session.Storage(session_lifetime)
             routes.extend(
                 [(r"/(ui)?", RedirectHandler, dict(url="/ui/"))]
                 + webui.core.get_routes(
@@ -156,17 +173,6 @@ def configure_app(  # noqa: PLR0913
                     auth_provider=lib_auth_provider,
                 )
             )
-            # Create WebUI auth factory (session -> socket fallback)
-            session_factory = webui.auth_provider.SessionAuthProviderFactory(
-                lib_auth_provider, session_storage
-            )
-            ui_auth_factory = auth_provider.AuthProviderMultiFactory(
-                [session_factory, socket_auth_factory]
-            )
-        else:
-            # No WebUI: only socket authentication
-            ui_auth_factory = socket_auth_factory
-
         # Even with disabled (standalone) webui the following routes must be
         # provided because they can be used via unix socket from cockpit.
         # Handlers for these routes are the same in both cases, the only
