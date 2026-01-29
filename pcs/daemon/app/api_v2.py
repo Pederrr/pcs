@@ -70,11 +70,11 @@ class _BaseApiV2Handler(BaseHandler):
         self.__auth_provider = api_auth_provider_factory.create(self)
 
     def prepare(self) -> None:
+        self.set_header("Content-Type", "application/json")
         if not self.__auth_provider.can_handle_request():
             raise APIError(http_code=401)
 
         """JSON preprocessing"""
-        self.add_header("Content-Type", "application/json")
         if (
             "Content-Type" in self.request.headers
             and self.request.headers["Content-Type"] == "application/json"
@@ -131,6 +131,7 @@ class _BaseApiV2Handler(BaseHandler):
         already set by tornado.
         :param status_code: HTTP status code
         """
+        self.set_header("Content-Type", "application/json")
         response = {
             "http_code": status_code,
             "http_error": responses.get(status_code, "Unknown"),
