@@ -74,7 +74,7 @@ class _BaseApiV2Handler(BaseHandler):
         if not self.__auth_provider.can_handle_request():
             raise APIError(http_code=401)
 
-        """JSON preprocessing"""
+        # JSON preprocessing
         if (
             "Content-Type" in self.request.headers
             and self.request.headers["Content-Type"] == "application/json"

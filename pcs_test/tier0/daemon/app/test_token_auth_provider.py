@@ -19,7 +19,7 @@ class TokenAuthProviderTest(IsolatedAsyncioTestCase):
     def test_can_handle_request_returns_true_with_cookie(self):
         self.assertTrue(self.provider.can_handle_request())
 
-    def test_can_handl_request_returns_false_without_cookie(self):
+    def test_can_handle_request_returns_false_without_cookie(self):
         del self.cookie_jar["token"]
         self.assertFalse(self.provider.can_handle_request())
 
