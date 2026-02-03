@@ -110,7 +110,13 @@ fi
 PKG_CHECK_MODULES([openrc], [openrc], [have_openrc=yes], [have_openrc=no])
 if test "$have_openrc" = yes; then
 	AC_PATH_PROG([RC_SERVICE], [rc-service])
+	if test "x$RC_SERVICE" = "x"; then
+		AC_MSG_ERROR([Unable to find rc-service binary])
+	fi
 	AC_PATH_PROG([RC_UPDATE], [rc-update])
+	if test "x$RC_UPDATE" = "x"; then
+		AC_MSG_ERROR([Unable to find rc-update binary])
+	fi
 fi
 
 # If no init systems were found, raise an error
