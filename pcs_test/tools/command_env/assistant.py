@@ -52,6 +52,9 @@ def patch_env(call_queue, config, init_env, is_systemd=True):
 
     orig_cmd_runner = init_env.cmd_runner
     get_node_communicator = init_env.get_node_communicator
+    get_node_communicator_no_privilege_transition = (
+        init_env.get_node_communicator_no_privilege_transition
+    )
     mock_communicator_factory = mock.Mock(spec_set=NodeCommunicatorFactory)
     mock_communicator_factory.get_communicator = (
         # TODO: use request_timeout
@@ -59,6 +62,16 @@ def patch_env(call_queue, config, init_env, is_systemd=True):
             NodeCommunicator(call_queue)
             if not config.spy
             else spy.NodeCommunicator(get_node_communicator())
+        )
+    )
+    mock_communicator_factory.get_communicator_no_privilege_transition = (
+        # TODO: use request_timeout
+        lambda request_timeout=None: (
+            NodeCommunicator(call_queue)
+            if not config.spy
+            else spy.NodeCommunicator(
+                get_node_communicator_no_privilege_transition
+            )
         )
     )
 

@@ -74,6 +74,15 @@ def add_existing_cluster(  # noqa: PLR0912, PLR0915
         )
         raise LibraryError()
 
+    # When using the regular node_communicator, we are handling the requests
+    # with the permissions of the user that used this lib command, but only
+    # hacluster is allowed to do some actions.
+    # We already know the hacluster token here, so we allow non-hacluster
+    # users to send the request with permission of hacluster
+    no_privilege_transition_node_communicator = (
+        env.get_node_communicator_no_privilege_transition()
+    )
+
     # we want to continue even when not able to get the known hosts
     # so we are overriding all of the communication errors to be warnings in
     # this case
@@ -81,7 +90,9 @@ def add_existing_cluster(  # noqa: PLR0912, PLR0915
         env.report_processor, cluster_name, force_all_errors=True
     )
     get_cluster_known_hosts_cmd.set_targets(remote_request_targets)
-    new_hosts = run(node_communicator, get_cluster_known_hosts_cmd)
+    new_hosts = run(
+        no_privilege_transition_node_communicator, get_cluster_known_hosts_cmd
+    )
 
     is_in_cluster = FileInstance.for_corosync_conf().raw_file.exists()
 
@@ -106,7 +117,7 @@ def add_existing_cluster(  # noqa: PLR0912, PLR0915
                 new_hosts,
                 local_cluster_name,
                 local_request_targets,
-                node_communicator,
+                no_privilege_transition_node_communicator,
                 env.report_processor,
             )
         else:
@@ -124,7 +135,7 @@ def add_existing_cluster(  # noqa: PLR0912, PLR0915
             new_cluster_entry,
             local_cluster_name,
             local_request_targets,
-            node_communicator,
+            no_privilege_transition_node_communicator,
             env.report_processor,
         )
     else:

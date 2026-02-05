@@ -67,14 +67,13 @@ def auth_hosts(  # noqa: PLR0912
     ).has_errors:
         raise LibraryError()
 
-    node_communicator = env.get_node_communicator()
     com_cmd = Auth(hosts, env.report_processor)
     # we do not want to raise LibraryError in case only some nodes returned
     # errors, since we want to update the known-hosts file with whatever tokens
     # we were able to receive - this is how the old impl behaved
     # this means we cannot blindly check errors by using processor.has_errors
     received_tokens: dict[str, str] = run(
-        node_communicator,
+        env.get_node_communicator(),
         com_cmd,
     )  # type: ignore[no-untyped-call]
 
@@ -145,7 +144,7 @@ def auth_hosts(  # noqa: PLR0912
         [],
         cluster_name,
         target_list,
-        node_communicator,
+        env.get_node_communicator_no_privilege_transition(),
         env.report_processor,
     )
     if conflict_detected:
@@ -262,7 +261,6 @@ def _deauth_hosts_common(
             raise LibraryError()
         return
 
-    node_communicator = env.get_node_communicator()
     corosync_conf = env.get_corosync_conf()
     cluster_name = corosync_conf.get_cluster_name()
     node_names, report_list = get_existing_nodes_names(corosync_conf, None)
@@ -285,7 +283,7 @@ def _deauth_hosts_common(
         hosts_to_deauth,
         cluster_name,
         target_list,
-        node_communicator,
+        env.get_node_communicator_no_privilege_transition(),
         env.report_processor,
     )
     if conflict_detected:
