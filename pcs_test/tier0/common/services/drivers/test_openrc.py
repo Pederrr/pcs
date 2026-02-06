@@ -1,7 +1,5 @@
-from unittest import (
-    TestCase,
-    mock,
-)
+from textwrap import dedent
+from unittest import TestCase, mock
 
 from pcs.common.services import errors
 from pcs.common.services.drivers import OpenRcDriver
@@ -54,7 +52,7 @@ class BaseTestMixin:
             [self.executable] + self.cmd
         )
 
-    def test_instace_failure(self):
+    def test_instance_failure(self):
         result = ExecutorResult(1, "stdout", "stderr")
         self.mock_executor.run.return_value = result
         with self.assertRaises(self.exception) as cm:
@@ -109,7 +107,7 @@ class DisableTest(Base, BaseTestMixin):
         self.executable = self.rc_update_bin
         self.cmd = ["delete", self.service, "default"]
 
-    def test_not_intalled(self):
+    def test_not_installed(self):
         # pylint: disable=protected-access
         self.driver._available_services = [f"not_{self.service}"]
         self.driver_callback(self.service)
@@ -219,13 +217,13 @@ class IsRunningTest(Base):
 
 class IsInstalledTest(Base):
     def test_installed(self):
-        output = (
-            "test\n"
-            "service1\n"
-            "abc\n"
-            "xyz\n"
-            f"{self.service}\n"
-        )
+        output = dedent(f"""\
+            test
+            service1
+            abc
+            xyz
+            {self.service}
+            """)
         self.mock_executor.run.return_value = ExecutorResult(0, output, "")
         self.assertTrue(self.driver.is_installed(self.service))
         # Intetionally called twice to make sure that unit files listing is
@@ -236,12 +234,12 @@ class IsInstalledTest(Base):
         )
 
     def test_not_installed(self):
-        output = (
-            "test\n"
-            "service1\n"
-            "abc\n"
-            "xyz\n"
-        )
+        output = dedent("""\
+            test
+            service1
+            abc
+            xyz
+            """)
         self.mock_executor.run.return_value = ExecutorResult(0, output, "")
         self.assertFalse(self.driver.is_installed(self.service))
         # Intetionally called twice to make sure that unit files listing is
@@ -254,16 +252,16 @@ class IsInstalledTest(Base):
 
 class GetAvailableServicesTest(Base):
     def test_success(self):
-        output = (
-            "test\n"
-            "service1\n"
-            "abc\n"
-            "xyz\n"
-        )
+        output = dedent("""\
+            test
+            service1
+            abc
+            xyz
+            """)
         self.mock_executor.run.return_value = ExecutorResult(0, output, "")
         self.assertEqual(
             self.driver.get_available_services(),
-            ["test","service1", "abc", "xyz"],
+            ["test", "service1", "abc", "xyz"],
         )
         self.mock_executor.run.assert_called_once_with(
             [self.rc_service_bin, "--list"]
