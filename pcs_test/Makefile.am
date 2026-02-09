@@ -174,6 +174,7 @@ EXTRA_DIST		= \
 			  tier0/daemon/app/test_api_v0.py \
 			  tier0/daemon/app/test_api_v0_tools.py \
 			  tier0/daemon/app/test_api_v1.py \
+			  tier0/daemon/app/test_api_v2.py \
 			  tier0/daemon/app/test_app_auth.py \
 			  tier0/daemon/app/test_app_gui.py \
 			  tier0/daemon/app/test_app_redirect.py \
@@ -181,6 +182,7 @@ EXTRA_DIST		= \
 			  tier0/daemon/app/test_app_spa.py \
 			  tier0/daemon/app/test_auth_provider_multi.py \
 			  tier0/daemon/app/test_session_auth_provider.py \
+			  tier0/daemon/app/test_token_auth_provider.py \
 			  tier0/daemon/app/test_unix_socket_auth_provider.py \
 			  tier0/daemon/app/ui_manage/__init__.py \
 			  tier0/daemon/app/ui_manage/test_auth_gui_against_nodes.py \

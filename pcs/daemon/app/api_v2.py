@@ -1,50 +1,28 @@
 import json
 import logging
 from http.client import responses
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    Type,
-    cast,
-)
+from typing import Any, Dict, Optional, Type, cast
 
-from dacite import (
-    DaciteError,
-    MissingValueError,
-    UnexpectedDataError,
-)
-from tornado.web import (
-    HTTPError,
-    MissingArgumentError,
-)
+from dacite import DaciteError, MissingValueError, UnexpectedDataError
+from tornado.web import HTTPError, MissingArgumentError
 
-from pcs.common.async_tasks.dto import (
-    CommandDto,
-    TaskIdentDto,
-)
+from pcs.common.async_tasks.dto import CommandDto, TaskIdentDto
 from pcs.common.interface.dto import (
     DTOTYPE,
     PayloadConversionError,
     from_dict,
     to_dict,
 )
-from pcs.daemon.app.auth import (
-    NotAuthorizedException,
-    TokenAuthProvider,
+from pcs.daemon.app.auth import NotAuthorizedException
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderFactoryInterface,
+    ApiAuthProviderInterface,
 )
-from pcs.daemon.async_tasks.scheduler import (
-    Scheduler,
-    TaskNotFoundError,
-)
+from pcs.daemon.async_tasks.scheduler import Scheduler, TaskNotFoundError
 from pcs.daemon.async_tasks.types import Command
-from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.types import AuthUser
 
-from .common import (
-    BaseHandler,
-    RoutesType,
-)
+from .common import BaseHandler, RoutesType
 
 
 class APIError(HTTPError):
@@ -78,20 +56,25 @@ class _BaseApiV2Handler(BaseHandler):
     scheduler: Scheduler
     json: Optional[Dict[str, Any]] = None
     logger: logging.Logger
-    _auth_provider: TokenAuthProvider
+    __auth_provider: ApiAuthProviderInterface
 
     def initialize(
-        self, scheduler: Scheduler, auth_provider: AuthProvider
+        self,
+        scheduler: Scheduler,
+        api_auth_provider_factory: ApiAuthProviderFactoryInterface,
     ) -> None:
         super().initialize()
-        self._auth_provider = TokenAuthProvider(self, auth_provider)
         self.scheduler = scheduler
         # TODO: Turn into a constant
         self.logger = logging.getLogger("pcs.daemon.scheduler")
+        self.__auth_provider = api_auth_provider_factory.create(self)
 
     def prepare(self) -> None:
-        """JSON preprocessing"""
-        self.add_header("Content-Type", "application/json")
+        self.set_header("Content-Type", "application/json")
+        if not self.__auth_provider.can_handle_request():
+            raise APIError(http_code=401)
+
+        # JSON preprocessing
         if (
             "Content-Type" in self.request.headers
             and self.request.headers["Content-Type"] == "application/json"
@@ -105,7 +88,7 @@ class _BaseApiV2Handler(BaseHandler):
 
     async def get_auth_user(self) -> AuthUser:
         try:
-            return await self._auth_provider.auth_by_token()
+            return await self.__auth_provider.auth_user()
         except NotAuthorizedException as e:
             raise APIError(http_code=401) from e
 
@@ -148,6 +131,7 @@ class _BaseApiV2Handler(BaseHandler):
         already set by tornado.
         :param status_code: HTTP status code
         """
+        self.set_header("Content-Type", "application/json")
         response = {
             "http_code": status_code,
             "http_error": responses.get(status_code, "Unknown"),
@@ -250,15 +234,17 @@ class KillTaskHandler(_BaseApiV2Handler):
 
 
 def get_routes(
+    api_auth_provider_factory: ApiAuthProviderFactoryInterface,
     scheduler: Scheduler,
-    auth_provider: AuthProvider,
 ) -> RoutesType:
     """
     Returns mapping of URL routes to functions and links API to the scheduler
     :param scheduler: Scheduler's instance
     :return: URL to handler mapping
     """
-    params = dict(scheduler=scheduler, auth_provider=auth_provider)
+    params = dict(
+        api_auth_provider_factory=api_auth_provider_factory, scheduler=scheduler
+    )
     return [
         ("/api/v2/task/result", TaskInfoHandler, params),
         ("/api/v2/task/create", NewTaskHandler, params),
