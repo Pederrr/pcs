@@ -26,7 +26,10 @@ from pcs_test.tools.command_env.mock_fs import (
 from pcs_test.tools.command_env.mock_get_local_corosync_conf import (
     get_get_local_corosync_conf,
 )
-from pcs_test.tools.command_env.mock_node_communicator import NodeCommunicator
+from pcs_test.tools.command_env.mock_node_communicator import (
+    NodeCommunicator,
+    NodeCommunicatorType,
+)
 from pcs_test.tools.command_env.mock_push_cib import (
     get_push_cib,
     is_push_cib_call_in,
@@ -67,10 +70,13 @@ def patch_env(call_queue, config, init_env, is_systemd=True):
     mock_communicator_factory.get_communicator_no_privilege_transition = (
         # TODO: use request_timeout
         lambda request_timeout=None: (
-            NodeCommunicator(call_queue)
+            NodeCommunicator(
+                call_queue,
+                communicator_type=NodeCommunicatorType.NO_PRIVILEGE_TRANSITION,
+            )
             if not config.spy
             else spy.NodeCommunicator(
-                get_node_communicator_no_privilege_transition
+                get_node_communicator_no_privilege_transition()
             )
         )
     )

@@ -9,6 +9,7 @@ from pcs.common.file_type_codes import (
 from pcs.common.types import StringSequence
 
 from pcs_test.tools.command_env.mock_node_communicator import (
+    NodeCommunicatorType,
     place_multinode_call,
 )
 
@@ -29,6 +30,7 @@ class PcsCfgsyncShortcuts:
         force: bool = False,
         node_labels: Optional[StringSequence] = None,
         communication_list: Optional[Mapping[str, str]] = None,
+        communicator_type: NodeCommunicatorType = NodeCommunicatorType.SIMPLE,
         name="http.pcs_cfgsync.set_configs",
     ):
         """
@@ -61,6 +63,7 @@ class PcsCfgsyncShortcuts:
             name,
             node_labels,
             communication_list,
+            communicator_type,
             action="remote/set_configs",
             param_list=[
                 (
