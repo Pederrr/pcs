@@ -1,9 +1,5 @@
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    Mapping,
-)
+from typing import Any, Callable, Mapping
 
 from pcs.lib.commands import (  # services,
     acl,
@@ -118,7 +114,7 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
     ),
     "auth.auth_hosts": _Cmd(
         cmd=auth.auth_hosts,
-        required_permission=p.WRITE,
+        required_permission=p.UNRESTRICTED,
     ),
     "booth.ticket_cleanup": _Cmd(
         cmd=booth.ticket_cleanup,
@@ -254,7 +250,9 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
     ),
     "manage_clusters.add_existing_cluster": _Cmd(
         cmd=manage_clusters.add_existing_cluster,
-        required_permission=p.WRITE,
+        # needs to be UNRESTRICTED for backwards compatibility with
+        # the original handler in ruby
+        required_permission=p.UNRESTRICTED,
     ),
     "node.maintenance_unmaintenance_all": _Cmd(
         cmd=node.maintenance_unmaintenance_all,

@@ -1,25 +1,12 @@
 from logging import Logger
-from typing import (
-    Any,
-    Callable,
-    Mapping,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Mapping, Optional, Union, cast
 
 from lxml.etree import _Element
 
-from pcs.common import (
-    file_type_codes,
-    reports,
-)
+from pcs.common import file_type_codes, reports
 from pcs.common.communication.logger import CommunicatorLogger
 from pcs.common.host import PcsKnownHost
-from pcs.common.node_communicator import (
-    Communicator,
-    NodeCommunicatorFactory,
-)
+from pcs.common.node_communicator import Communicator, NodeCommunicatorFactory
 from pcs.common.reports import ReportProcessor
 from pcs.common.reports.item import ReportItem
 from pcs.common.reports.processor import ReportProcessorToLog
@@ -33,10 +20,7 @@ from pcs.lib.communication.corosync import (
     DistributeCorosyncConf,
     ReloadCorosyncConf,
 )
-from pcs.lib.communication.tools import (
-    run,
-    run_and_raise,
-)
+from pcs.lib.communication.tools import run, run_and_raise
 from pcs.lib.corosync.config_facade import ConfigFacade as CorosyncConfigFacade
 from pcs.lib.corosync.config_parser import (
     verify_section as verify_corosync_section,
@@ -48,9 +32,7 @@ from pcs.lib.external import CommandRunner
 from pcs.lib.file.instance import FileInstance
 from pcs.lib.interface.config import ParserErrorException
 from pcs.lib.node import get_existing_nodes_names
-from pcs.lib.node_communication import (
-    NodeTargetLibFactory,
-)
+from pcs.lib.node_communication import NodeTargetLibFactory
 from pcs.lib.pacemaker.live import (
     diff_cibs_xml,
     ensure_cib_version,
@@ -501,6 +483,15 @@ class LibraryEnvironment:
     ) -> Communicator:
         return self.communicator_factory.get_communicator(
             request_timeout=request_timeout
+        )
+
+    def get_node_communicator_no_privilege_transition(
+        self, request_timeout: Optional[int] = None
+    ) -> Communicator:
+        return (
+            self.communicator_factory.get_communicator_no_privilege_transition(
+                request_timeout=request_timeout
+            )
         )
 
     def get_node_target_factory(self) -> NodeTargetLibFactory:

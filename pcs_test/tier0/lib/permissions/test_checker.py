@@ -309,3 +309,20 @@ class PermissionsCheckerIsAuthorizedTest(TestCase):
             ],
             self.logger.debug.mock_calls,
         )
+
+    def test_unrestricted(self):
+        user = AuthUser("user-full", ("group1", "group2"))
+        access = PermissionAccessType.UNRESTRICTED
+        self.assertTrue(self.checker.is_authorized(user, access))
+        self.assertEqual(
+            [
+                mock.call(
+                    "Permission check: username=%s groups=%s access=%s",
+                    user.username,
+                    ",".join(user.groups),
+                    str(access.value),
+                ),
+                mock.call("%s access granted", str(access.value).capitalize()),
+            ],
+            self.logger.debug.mock_calls,
+        )

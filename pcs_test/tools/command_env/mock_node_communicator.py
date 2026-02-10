@@ -1,4 +1,5 @@
 import json
+from enum import Enum
 from urllib.parse import parse_qs
 
 from pcs import settings
@@ -15,6 +16,11 @@ from pcs_test.tools.custom_mock import MockCurlSimple
 
 CALL_TYPE_HTTP_ADD_REQUESTS = "CALL_TYPE_HTTP_ADD_REQUESTS"
 CALL_TYPE_HTTP_START_LOOP = "CALL_TYPE_HTTP_START_LOOP"
+
+
+class NodeCommunicatorType(Enum):
+    SIMPLE = "simple"
+    NO_PRIVILEGE_TRANSITION = "no_privilege_transition"
 
 
 def log_request(request):
@@ -221,6 +227,7 @@ def place_multinode_call(
     name,
     node_labels=None,
     communication_list=None,
+    communicator_type: NodeCommunicatorType = NodeCommunicatorType.SIMPLE,
     before=None,
     **kwargs,
 ):
@@ -246,25 +253,47 @@ def place_multinode_call(
         else [{"label": label} for label in node_labels]
     )
     place_communication(
-        calls, name, communication_list, before=before, **kwargs
+        calls,
+        name,
+        communication_list,
+        communicator_type,
+        before=before,
+        **kwargs,
     )
 
 
-def place_requests(calls, name, request_list, before=None):
-    calls.place(name, AddRequestCall(request_list), before=before)
+def place_requests(
+    calls,
+    name,
+    request_list,
+    communicator_type: NodeCommunicatorType = NodeCommunicatorType.SIMPLE,
+    before=None,
+):
+    calls.place(
+        name, AddRequestCall(request_list, communicator_type), before=before
+    )
 
 
 def place_responses(calls, name, response_list, before=None):
     calls.place(name, StartLoopCall(response_list), before=before)
 
 
-def place_communication(calls, name, communication_list, before=None, **kwargs):
+def place_communication(
+    calls,
+    name,
+    communication_list,
+    communicator_type: NodeCommunicatorType = NodeCommunicatorType.SIMPLE,
+    before=None,
+    **kwargs,
+):
     if not communication_list:
         # If code runs a communication command with no targets specified, the
         # whole communicator and CURL machinery gets started. It doesn't
         # actually send any HTTP requests but it adds an empty list of requests
         # to CURL and starts the CURL loop. And the mock must do the same.
-        place_requests(calls, f"{name}_requests", [], before=before)
+        place_requests(
+            calls, f"{name}_requests", [], communicator_type, before=before
+        )
         place_responses(calls, f"{name}_responses", [], before=before)
         return
 
@@ -278,27 +307,43 @@ def place_communication(calls, name, communication_list, before=None, **kwargs):
         request_list.append(req_list)
         response_list.extend(res_list)
 
-    place_requests(calls, f"{name}_requests", request_list[0], before=before)
+    place_requests(
+        calls,
+        f"{name}_requests",
+        request_list[0],
+        communicator_type,
+        before=before,
+    )
     place_responses(calls, f"{name}_responses", response_list, before=before)
     for i, req_list in enumerate(request_list[1:], start=1):
-        place_requests(calls, f"{name}_requests_{i}", req_list, before=before)
+        place_requests(
+            calls,
+            f"{name}_requests_{i}",
+            req_list,
+            communicator_type,
+            before=before,
+        )
 
 
 class AddRequestCall:
     type = CALL_TYPE_HTTP_ADD_REQUESTS
 
-    def __init__(self, request_list):
+    def __init__(self, request_list, communicator_type: NodeCommunicatorType):
         self.request_list = request_list
+        self.communicator_type = communicator_type
 
     def format(self):
-        return "Requests:\n    * {0}".format(
+        return "Requests (communicator: {0}):\n    * {1}".format(
+            self.communicator_type.value,
             "\n    * ".join(
                 [log_request(request) for request in self.request_list]
-            )
+            ),
         )
 
     def __repr__(self):
-        return str("<HttpAddRequest '{0}'>").format(self.request_list)
+        return str("<HttpAddRequest communicator='{0}' '{1}'>").format(
+            self.communicator_type.value, self.request_list
+        )
 
 
 class StartLoopCall:
@@ -347,14 +392,29 @@ def _compare_request_data(expected, real):
 
 
 class NodeCommunicator:
-    def __init__(self, call_queue=None):
+    def __init__(
+        self,
+        call_queue=None,
+        communicator_type: NodeCommunicatorType = NodeCommunicatorType.SIMPLE,
+    ):
         self.__call_queue = call_queue
+        self.__communicator_type = communicator_type
 
     def add_requests(self, request_list):
         _, add_request_call = self.__call_queue.take(
-            CALL_TYPE_HTTP_ADD_REQUESTS,
-            request_list,
+            CALL_TYPE_HTTP_ADD_REQUESTS, request_list
         )
+
+        expected_communicator_type = add_request_call.communicator_type
+        if expected_communicator_type != self.__communicator_type:
+            raise AssertionError(
+                f"HTTP request sent via wrong communicator type.\n"
+                f"  Expected: {expected_communicator_type.value}\n"
+                f"  Actual: {self.__communicator_type.value}\n"
+                "This likely means get_node_communicator() was used when "
+                "get_node_communicator_no_privilege_transition() was expected, "
+                "or vice versa."
+            )
 
         expected_request_list = add_request_call.request_list
 

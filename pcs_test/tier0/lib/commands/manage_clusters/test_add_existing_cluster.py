@@ -15,6 +15,9 @@ from pcs.lib.permissions.config.types import (
 
 from pcs_test.tools import fixture
 from pcs_test.tools.command_env import get_env_tools
+from pcs_test.tools.command_env.mock_node_communicator import (
+    NodeCommunicatorType,
+)
 from pcs_test.tools.fixture_pcs_cfgsync import (
     fixture_known_hosts_file_content,
     fixture_pcs_settings_file_content,
@@ -236,6 +239,7 @@ class FixtureMixin:
                     )
                 ),
                 name="get_cluster_known_hosts",
+                communicator_type=NodeCommunicatorType.NO_PRIVILEGE_TRANSITION,
             )
         elif new_hosts_mode == "error":
             self.config.http.place_multinode_call(
@@ -250,6 +254,7 @@ class FixtureMixin:
                 param_list=[],
                 name="get_cluster_known_hosts",
                 output="",
+                communicator_type=NodeCommunicatorType.NO_PRIVILEGE_TRANSITION,
             )
         else:
             self.config.http.place_multinode_call(
@@ -258,6 +263,7 @@ class FixtureMixin:
                 param_list=[],
                 output=json.dumps({"foo": "bar"}),
                 name="get_cluster_known_hosts",
+                communicator_type=NodeCommunicatorType.NO_PRIVILEGE_TRANSITION,
             )
 
         self.config.raw_file.exists(

@@ -129,14 +129,17 @@ class PermissionsChecker:
             ",".join(auth_user.groups),
             str(access.value),
         )
-        user_permissions = self.get_permissions(auth_user)
-        self._logger.debug(
-            "Current user permissions: %s",
-            ",".join(
-                sorted(permission.value for permission in user_permissions)
-            ),
-        )
-        result = access in user_permissions
+        if access is PermissionAccessType.UNRESTRICTED:
+            result = True
+        else:
+            user_permissions = self.get_permissions(auth_user)
+            self._logger.debug(
+                "Current user permissions: %s",
+                ",".join(
+                    sorted(permission.value for permission in user_permissions)
+                ),
+            )
+            result = access in user_permissions
         if result:
             self._logger.debug(
                 "%s access granted", str(access.value).capitalize()

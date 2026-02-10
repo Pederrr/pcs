@@ -15,6 +15,9 @@ from pcs.lib.permissions.config.exporter import ExporterV2
 from pcs.lib.permissions.config.types import ClusterPermissions, ConfigV2
 
 from pcs_test.tools.command_env.config import Config as EnvConfig
+from pcs_test.tools.command_env.mock_node_communicator import (
+    NodeCommunicatorType,
+)
 
 
 def fixture_communication_result_string(
@@ -71,24 +74,33 @@ def fixture_save_sync_new_version_success(
     node_labels: list[str],
     cluster_name: str = "test99",
     file_contents: str = "",
+    communicator_type: NodeCommunicatorType = (
+        NodeCommunicatorType.NO_PRIVILEGE_TRANSITION
+    ),
 ) -> None:
     config.http.pcs_cfgsync.set_configs(
         cluster_name=cluster_name,
         node_labels=node_labels,
         file_contents=file_contents,
         name="save_sync_new_version.set_configs",
+        communicator_type=communicator_type,
     )
 
 
-def fixture_save_sync_new_version_conflict(
+def fixture_save_sync_new_version_conflict(  # noqa: PLR0913
     config: EnvConfig,
     node_labels: list[str],
     cluster_name: str = "test99",
-    file_type_code: file_type_codes.FileTypeCode = file_type_codes.PCS_SETTINGS_CONF,
+    file_type_code: file_type_codes.FileTypeCode = (
+        file_type_codes.PCS_SETTINGS_CONF
+    ),
     local_file_content: str = "",
     fetch_after_conflict: bool = True,
     remote_file_content: str = "",
     name_prefix: str = "",
+    communicator_type: NodeCommunicatorType = (
+        NodeCommunicatorType.NO_PRIVILEGE_TRANSITION
+    ),
 ) -> None:
     config.http.pcs_cfgsync.set_configs(
         cluster_name,
@@ -106,6 +118,7 @@ def fixture_save_sync_new_version_conflict(
         ]
         + [{"label": node} for node in node_labels[1:]],
         name=f"{name_prefix}save_sync_new_version.set_configs",
+        communicator_type=communicator_type,
     )
     if not fetch_after_conflict:
         return
@@ -121,6 +134,7 @@ def fixture_save_sync_new_version_conflict(
         action="api/v1/cfgsync-get-configs/v1",
         raw_data=json.dumps({"cluster_name": cluster_name}),
         name=f"{name_prefix}save_sync_new_version.fetch_after_conflict",
+        communicator_type=communicator_type,
     )
     config.raw_file.exists(
         file_type_code,
@@ -139,9 +153,14 @@ def fixture_save_sync_new_version_error(
     config: EnvConfig,
     node_labels: list[str],
     cluster_name: str = "test99",
-    file_type_code: file_type_codes.FileTypeCode = file_type_codes.PCS_SETTINGS_CONF,
+    file_type_code: file_type_codes.FileTypeCode = (
+        file_type_codes.PCS_SETTINGS_CONF
+    ),
     local_file_content: str = "",
     name_prefix: str = "",
+    communicator_type: NodeCommunicatorType = (
+        NodeCommunicatorType.NO_PRIVILEGE_TRANSITION
+    ),
 ) -> None:
     config.http.pcs_cfgsync.set_configs(
         cluster_name,
@@ -159,6 +178,7 @@ def fixture_save_sync_new_version_error(
         ]
         + [{"label": node} for node in node_labels[1:]],
         name=f"{name_prefix}save_sync_new_version.set_configs",
+        communicator_type=communicator_type,
     )
 
 
@@ -168,6 +188,9 @@ def fixture_save_sync_new_known_hosts_success(
     cluster_name: str = "test99",
     file_data_version: int = 1,
     known_hosts: Optional[Mapping[str, PcsKnownHost]] = None,
+    communicator_type: NodeCommunicatorType = (
+        NodeCommunicatorType.NO_PRIVILEGE_TRANSITION
+    ),
 ) -> None:
     config.http.pcs_cfgsync.set_configs(
         cluster_name=cluster_name,
@@ -176,6 +199,7 @@ def fixture_save_sync_new_known_hosts_success(
                 file_data_version, known_hosts or {}
             )
         },
+        communicator_type=communicator_type,
         node_labels=node_labels,
         name="save_sync_new_known_hosts.set_configs",
     )
@@ -189,6 +213,9 @@ def fixture_save_sync_new_known_hosts_conflict(
     hosts_to_remove: Sequence[str] = (),
     cluster_name: str = "test99",
     file_data_version: int = 1,
+    communicator_type: NodeCommunicatorType = (
+        NodeCommunicatorType.NO_PRIVILEGE_TRANSITION
+    ),
 ) -> str:
     if new_hosts and hosts_to_remove:
         raise AssertionError(
@@ -243,6 +270,7 @@ def fixture_save_sync_new_known_hosts_conflict(
         fetch_after_conflict=True,
         remote_file_content=remote_file,
         name_prefix="sync_initial",
+        communicator_type=communicator_type,
     )
 
     fixture_save_sync_new_version_conflict(
@@ -254,6 +282,7 @@ def fixture_save_sync_new_known_hosts_conflict(
         fetch_after_conflict=True,
         remote_file_content=even_more_new_remote_file,
         name_prefix="sync_after_merge",
+        communicator_type=communicator_type,
     )
 
     return even_more_new_remote_file
@@ -265,6 +294,9 @@ def fixture_save_sync_new_known_hosts_error(
     cluster_name: str = "test99",
     file_data_version: int = 1,
     known_hosts: Optional[Mapping[str, PcsKnownHost]] = None,
+    communicator_type: NodeCommunicatorType = (
+        NodeCommunicatorType.NO_PRIVILEGE_TRANSITION
+    ),
 ) -> None:
     fixture_save_sync_new_version_error(
         config,
@@ -272,4 +304,5 @@ def fixture_save_sync_new_known_hosts_error(
         cluster_name,
         file_type_codes.PCS_KNOWN_HOSTS,
         fixture_known_hosts_file_content(file_data_version, known_hosts or {}),
+        communicator_type=communicator_type,
     )

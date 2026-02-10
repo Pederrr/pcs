@@ -479,6 +479,24 @@ class NodeCommunicatorFactory:
             self._logger, self._user, self._groups, request_timeout=timeout
         )
 
+    def get_communicator_no_privilege_transition(
+        self, request_timeout: Optional[int] = None
+    ) -> Communicator:
+        """
+        Create a node communicator that does not set the effective user cookies
+
+        Requests sent by this Communicator are processed using the permissions
+        of the user identified by the RequestTarget token
+        """
+
+        timeout = request_timeout if request_timeout else self._request_timeout
+        return Communicator(
+            communicator_logger=self._logger,
+            user=None,
+            groups=None,
+            request_timeout=timeout,
+        )
+
     def get_multiaddress_communicator(
         self, request_timeout: Optional[int] = None
     ) -> MultiaddressCommunicator:
