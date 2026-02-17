@@ -1,16 +1,8 @@
 import logging
-from typing import (
-    Collection,
-    Sequence,
-    Set,
-    cast,
-)
+from typing import Collection, cast
 
 from pcs.common.file import RawFileError
-from pcs.lib.auth.const import (
-    ADMIN_GROUP,
-    SUPERUSER,
-)
+from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
 from pcs.lib.file.instance import FileInstance
 from pcs.lib.file.json import JsonParserException
@@ -18,30 +10,13 @@ from pcs.lib.interface.config import ParserErrorException
 
 from .config.facade import FacadeV2
 from .config.parser import ParserError
-from .config.types import (
-    ClusterPermissions,
-    ConfigV2,
-    PermissionAccessType,
-    PermissionEntry,
-    PermissionTargetType,
-)
-
-
-def _get_empty_facade(permissions: Sequence[PermissionEntry]) -> FacadeV2:
-    return FacadeV2(
-        ConfigV2(
-            data_version=1,
-            clusters=[],
-            permissions=ClusterPermissions(
-                local_cluster=permissions,
-            ),
-        )
-    )
+from .config.types import PermissionAccessType, PermissionTargetType
+from .const import DEFAULT_PERMISSIONS
 
 
 def _complete_access_list(
     access_list: Collection[PermissionAccessType],
-) -> Set[PermissionAccessType]:
+) -> set[PermissionAccessType]:
     if PermissionAccessType.SUPERUSER in access_list:
         return set(PermissionAccessType)
     if PermissionAccessType.FULL in access_list:
@@ -68,19 +43,7 @@ class PermissionsChecker:
                 "File '%s' doesn't exist, using default configuration",
                 self._config_file_instance.raw_file.metadata.path,
             )
-            return _get_empty_facade(
-                (
-                    PermissionEntry(
-                        type=PermissionTargetType.GROUP,
-                        name=ADMIN_GROUP,
-                        allow=(
-                            PermissionAccessType.READ,
-                            PermissionAccessType.WRITE,
-                            PermissionAccessType.GRANT,
-                        ),
-                    ),
-                )
-            )
+            return FacadeV2.create(permissions=DEFAULT_PERMISSIONS)
         try:
             return cast(FacadeV2, self._config_file_instance.read_to_facade())
         except ParserError as e:
@@ -105,13 +68,13 @@ class PermissionsChecker:
                 self._config_file_instance.raw_file.metadata.path,
                 e.reason,
             )
-        return _get_empty_facade(tuple())
+        return FacadeV2.create()
 
-    def get_permissions(self, auth_user: AuthUser) -> Set[PermissionAccessType]:
+    def get_permissions(self, auth_user: AuthUser) -> set[PermissionAccessType]:
         if auth_user.username == SUPERUSER:
             return _complete_access_list((PermissionAccessType.SUPERUSER,))
         facade = self._get_facade()
-        all_permissions: Set[PermissionAccessType] = set()
+        all_permissions: set[PermissionAccessType] = set()
         for target_name, target_type in [
             (auth_user.username, PermissionTargetType.USER)
         ] + [(group, PermissionTargetType.GROUP) for group in auth_user.groups]:

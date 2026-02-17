@@ -31,7 +31,7 @@ class FacadeV2(SyncVersionFacadeInterface):
         permissions: Optional[list[PermissionEntry]] = None,
     ) -> "FacadeV2":
         return cls(
-            ConfigV2(data_version, [], ClusterPermissions(permissions or []))
+            ConfigV2(data_version, [], ClusterPermissions(permissions or ()))
         )
 
     @property
