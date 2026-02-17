@@ -16,8 +16,13 @@ from pcs.common.corosync_conf import (
     CorosyncConfDto,
     CorosyncQuorumDeviceSettingsDto,
 )
-from pcs.common.file import RawFileError
-from pcs.common.node_communicator import HostNotFound
+from pcs.common.file_type_codes import PCS_SETTINGS_CONF
+from pcs.common.node_communicator import (
+    Communicator,
+    HostNotFound,
+    RequestTarget,
+)
+from pcs.common.permissions.types import SetPermissionDto
 from pcs.common.reports import ReportProcessor
 from pcs.common.reports import codes as report_codes
 from pcs.common.reports.item import (
@@ -35,6 +40,7 @@ from pcs.lib import (
     sbd,
     validate,
 )
+from pcs.lib.auth.types import AuthUser
 from pcs.lib.booth import sync as booth_sync
 from pcs.lib.cib import fencing_topology
 from pcs.lib.cib.nvpair_multi import NVSET_INSTANCE, find_nvsets
@@ -81,12 +87,9 @@ from pcs.lib.corosync import (
     qdevice_net,
 )
 from pcs.lib.corosync import constants as corosync_constants
-from pcs.lib.env import (
-    LibraryEnvironment,
-    WaitType,
-)
-from pcs.lib.errors import LibraryError
+from pcs.lib.env import LibraryEnvironment, LibraryError, WaitType
 from pcs.lib.file.instance import FileInstance
+from pcs.lib.file.raw_file import RawFileError, raw_file_error_report
 from pcs.lib.interface.config import ParserErrorException
 from pcs.lib.node import get_existing_nodes_names
 from pcs.lib.pacemaker.live import (
@@ -100,6 +103,20 @@ from pcs.lib.pacemaker.live import (
 from pcs.lib.pacemaker.live import verify as verify_cmd
 from pcs.lib.pacemaker.state import ClusterState
 from pcs.lib.pacemaker.values import get_valid_timeout_seconds
+from pcs.lib.pcs_cfgsync.save_sync import (
+    save_sync_new_version,
+)
+from pcs.lib.permissions.checker import (
+    PermissionsChecker,
+    _complete_access_list,
+)
+from pcs.lib.permissions.config.facade import FacadeV2 as PcsSettingsFacade
+from pcs.lib.permissions.config.types import (
+    PermissionAccessType,
+    PermissionEntry,
+    PermissionTargetType,
+)
+from pcs.lib.permissions.tools import read_pcs_settings_conf
 from pcs.lib.resource_agent.types import ResourceAgentName
 from pcs.lib.tools import (
     environment_file_to_dict,
@@ -2421,3 +2438,199 @@ def rename(
 
     corosync_conf.set_cluster_name(new_name)
     env.push_corosync_conf(corosync_conf, skip_offline)
+
+
+# TODO: move to more appropriate module
+def _validate_set_permissions(
+    permissions: Sequence[SetPermissionDto],
+) -> reports.ReportItemList:
+    report_list: reports.ReportItemList = []
+    user_set: set[tuple[str, PermissionTargetType]] = set()
+    for perm in permissions:
+        if not perm.name:
+            # TODO error report about empty name
+            pass
+        if (perm.name, perm.type) in user_set:
+            # TODO error report about duplicate
+            pass
+        user_set.add((perm.name, perm.type))
+    return report_list
+
+
+# TODO: maybe move to the permissions.checker module
+def _validate_user_has_permissions_to_change_full_users(
+    pcs_settings: PcsSettingsFacade,
+    auth_user: AuthUser,
+    new_full_users: set[tuple[str, PermissionTargetType]],
+    permissions_checker: PermissionsChecker,
+) -> reports.ReportItemList:
+    old_full_users = {
+        (entry.name, entry.type)
+        for entry in pcs_settings.get_permission_with_allow_full()
+    }
+    if new_full_users != old_full_users:
+        # TODO: The user login_login and user_groups are none when calling
+        # this command from cli through lib_wrapper -> this will always break
+        # we could put the values there though = name and groups of the user
+        # that launched the cli command
+        if not permissions_checker.is_authorized(
+            auth_user, PermissionAccessType.FULL, facade=pcs_settings
+        ):
+            # TODO: error report -> only FULL users can add or remove FULL users
+            return []
+    return []
+
+
+# TODO: add to apiv2 (maybe the unoficial one) with permissions GRANT
+def set_permissions(
+    env: LibraryEnvironment, permissions: Sequence[SetPermissionDto]
+) -> None:
+    _validate_set_permissions(permissions)
+
+    new_full_users = set()
+    new_permission_list = []
+    for perm in permissions:
+        if PermissionAccessType.FULL in perm.allow:
+            new_full_users.add((perm.name, perm.type))
+        # Explicitly save dependant permissions. That way if the dependency is
+        # changed in the future, it won't revoke permissions which were once
+        # granted
+        allow = _complete_access_list(set(perm.allow))
+        new_permission_list.append(
+            PermissionEntry(name=perm.name, type=perm.type, allow=sorted(allow))
+        )
+
+    is_in_cluster = FileInstance.for_corosync_conf().raw_file.exists()
+
+    # TODO: The user user_login and user_groups are None when calling
+    # this command from cli through lib_wrapper -> this will break
+    # We could put set values though = name and groups of the user that launched
+    # the cli command
+    auth_user = AuthUser(env.user_login or "", env.user_groups or [])
+    permissions_checker = PermissionsChecker(env.logger)
+
+    # Save the new permissions
+    if not is_in_cluster:
+        pcs_settings, report_list = read_pcs_settings_conf()
+        if env.report_processor.report_list(report_list).has_errors:
+            raise LibraryError()
+
+        if env.report_processor.report_list(
+            _validate_user_has_permissions_to_change_full_users(
+                pcs_settings, auth_user, new_full_users, permissions_checker
+            )
+        ).has_errors:
+            raise LibraryError()
+
+        __update_pcs_settings_locally(
+            pcs_settings, new_permission_list, env.report_processor
+        )
+        if env.report_processor.has_errors:
+            raise LibraryError()
+        return
+
+    # The node is in cluster, sync the new config to all nodes
+    corosync_conf = env.get_corosync_conf()
+    local_cluster_name = corosync_conf.get_cluster_name()
+    local_corosync_nodes, _ = get_existing_nodes_names(corosync_conf)
+    request_targets = env.get_node_target_factory().get_target_list(
+        local_corosync_nodes
+    )
+    node_communicator = env.get_node_communicator_no_privilege_transition()
+
+    # backwards compatibility - conflict resolution
+    # If there is conflict on the first try, then we fetch the newest config
+    # from cluster, save it, and try to save the permissions again
+    for conflict_is_error in (False, True):
+        pcs_settings, report_list = read_pcs_settings_conf()
+        if env.report_processor.report_list(report_list).has_errors:
+            raise LibraryError()
+
+        if env.report_processor.report_list(
+            _validate_user_has_permissions_to_change_full_users(
+                pcs_settings, auth_user, new_full_users, permissions_checker
+            )
+        ).has_errors:
+            raise LibraryError()
+
+        successful = __sync_pcs_settings_in_cluster(
+            pcs_settings,
+            new_permission_list,
+            local_cluster_name,
+            request_targets,
+            node_communicator,
+            conflict_is_error,
+            env.report_processor,
+        )
+
+        if env.report_processor.has_errors:
+            raise LibraryError()
+        if successful:
+            return
+
+
+def __update_pcs_settings_locally(
+    pcs_settings: PcsSettingsFacade,
+    new_permission_list: Sequence[PermissionEntry],
+    report_processor: reports.ReportProcessor,
+) -> None:
+    for permission in new_permission_list:
+        pcs_settings.set_permission(permission)
+    pcs_settings.set_data_version(pcs_settings.data_version + 1)
+
+    try:
+        FileInstance.for_pcs_settings_config().write_facade(
+            pcs_settings, can_overwrite=True
+        )
+    except RawFileError as e:
+        report_processor.report(raw_file_error_report(e))
+
+
+def __sync_pcs_settings_in_cluster(
+    pcs_settings: PcsSettingsFacade,
+    new_permission_list: Sequence[PermissionEntry],
+    local_cluster_name: str,
+    request_targets: Sequence[RequestTarget],
+    node_communicator: Communicator,
+    conflict_is_error: bool,
+    report_processor: reports.ReportProcessor,
+) -> bool:
+    for permission in new_permission_list:
+        pcs_settings.set_permission(permission)
+
+    conflict_detected, failed_nodes, new_file = save_sync_new_version(
+        PCS_SETTINGS_CONF,
+        pcs_settings,
+        local_cluster_name,
+        request_targets,
+        node_communicator,
+        report_processor,
+        fetch_on_conflict=True,
+        reject_is_error=conflict_is_error,
+    )
+    if conflict_detected:
+        if conflict_is_error:
+            report_processor.report(
+                reports.ReportItem.error(
+                    reports.messages.PcsCfgsyncConflictRepeatAction()
+                )
+            )
+        try:
+            if new_file is not None:
+                FileInstance.for_pcs_settings_config().write_facade(
+                    new_file, can_overwrite=True
+                )
+        except RawFileError as e:
+            report_processor.report(raw_file_error_report(e))
+
+    if failed_nodes:
+        report_processor.report(
+            reports.ReportItem.error(
+                reports.messages.PcsCfgsyncSendingConfigsToNodesFailed(
+                    [file_type_codes.PCS_SETTINGS_CONF],
+                    sorted(failed_nodes),
+                )
+            )
+        )
+
+    return not conflict_detected and not failed_nodes

@@ -1,5 +1,5 @@
 import logging
-from typing import Collection, cast
+from typing import Collection, Optional, cast
 
 from pcs.common.file import RawFileError
 from pcs.lib.auth.const import SUPERUSER
@@ -70,10 +70,12 @@ class PermissionsChecker:
             )
         return FacadeV2.create()
 
-    def get_permissions(self, auth_user: AuthUser) -> set[PermissionAccessType]:
+    def get_permissions(
+        self, auth_user: AuthUser, facade: Optional[FacadeV2] = None
+    ) -> set[PermissionAccessType]:
         if auth_user.username == SUPERUSER:
             return _complete_access_list((PermissionAccessType.SUPERUSER,))
-        facade = self._get_facade()
+        facade = facade if facade is not None else self._get_facade()
         all_permissions: set[PermissionAccessType] = set()
         for target_name, target_type in [
             (auth_user.username, PermissionTargetType.USER)
@@ -84,7 +86,10 @@ class PermissionsChecker:
         return _complete_access_list(all_permissions)
 
     def is_authorized(
-        self, auth_user: AuthUser, access: PermissionAccessType
+        self,
+        auth_user: AuthUser,
+        access: PermissionAccessType,
+        facade: Optional[FacadeV2] = None,
     ) -> bool:
         self._logger.debug(
             "Permission check: username=%s groups=%s access=%s",
@@ -95,7 +100,7 @@ class PermissionsChecker:
         if access is PermissionAccessType.UNRESTRICTED:
             result = True
         else:
-            user_permissions = self.get_permissions(auth_user)
+            user_permissions = self.get_permissions(auth_user, facade)
             self._logger.debug(
                 "Current user permissions: %s",
                 ",".join(

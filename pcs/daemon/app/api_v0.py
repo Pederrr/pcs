@@ -237,6 +237,32 @@ class GetConfigsHandler(_BaseApiV0Handler):
         self.write(legacy_result)
 
 
+class SetPermissionsHandler(_BaseApiV0Handler):
+    """
+    Input format:
+
+    {
+        "permissions": {
+            "arbitrary-key": {
+                "name": "username",
+                "type": "user|group",
+                "allow": {
+                    "read": "1",
+                    "write": "1",
+                    "grant": "1",
+                    "full": "1",
+                }
+            }
+        }
+    }
+    """
+
+    async def _handle_request(self) -> None:
+        result = await self._run_library_command("cluster.set_permissions", {})
+        if not result.success:
+            raise self._error(reports_to_str(result.reports))
+
+
 def get_routes(
     api_auth_provider_factory: ApiAuthProviderFactoryInterface,
     scheduler: Scheduler,
@@ -282,4 +308,6 @@ def get_routes(
         ),
         # cfgsync
         (r("get_configs"), GetConfigsHandler, params),
+        # permissions
+        (r("set_permissions"), SetPermissionsHandler, params),
     ]

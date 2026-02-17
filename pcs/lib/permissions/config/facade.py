@@ -7,6 +7,7 @@ from .types import (
     ClusterEntry,
     ClusterPermissions,
     ConfigV2,
+    PermissionAccessType,
     PermissionEntry,
     PermissionTargetType,
 )
@@ -84,6 +85,13 @@ class FacadeV2(SyncVersionFacadeInterface):
         self._set_permissions(
             list(self.config.permissions.local_cluster) + [entry]
         )
+
+    def get_permission_with_allow_full(self) -> list[PermissionEntry]:
+        return [
+            entry
+            for entry in self.config.permissions.local_cluster
+            if PermissionAccessType.FULL in entry.allow
+        ]
 
     def is_cluster_name_in_use(self, cluster_name: str) -> bool:
         return any(
