@@ -240,8 +240,9 @@ class GetConfigsHandler(_BaseApiV0Handler):
 class SetPermissionsHandler(_BaseApiV0Handler):
     """
     Input format:
-
     {
+        "cluster_name": "name" # ignored
+        "cluster": "name" # ignored
         "permissions": {
             "arbitrary-key": {
                 "name": "username",
@@ -258,9 +259,41 @@ class SetPermissionsHandler(_BaseApiV0Handler):
     """
 
     async def _handle_request(self) -> None:
-        result = await self._run_library_command("cluster.set_permissions", {})
+        data_json = self.get_argument("json_data", "")
+
+        permissions = []
+        try:
+            permissions_raw = json.loads(data_json)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise self._error("{'status': 'bad_json'}") from e
+
+        permissions = [
+            {
+                "name": perm.get("name", ""),
+                "type": perm.get("type", ""),
+                "allow": [
+                    perm_name
+                    for perm_name, enabled in perm.get("allow", {}).items()
+                    if enabled == "1"
+                ],
+            }
+            for perm in permissions_raw.get("permissions", {}).values()
+        ]
+
+        result = await self._run_library_command(
+            "cluster.set_permissions", {"permissions": permissions}
+        )
+
+        if any(
+            rep.message.code == reports.codes.NOT_AUTHORIZED
+            for rep in result.reports
+        ):
+            self._error("", 403)
+
+        # TODO 403 when the FULL permissions error
         if not result.success:
             raise self._error(reports_to_str(result.reports))
+        self.write("Permissions saved")
 
 
 def get_routes(

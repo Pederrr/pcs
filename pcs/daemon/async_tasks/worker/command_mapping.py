@@ -156,6 +156,11 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
         cmd=cluster.rename,
         required_permission=p.FULL,
     ),
+    # TODO: we might want to not make this public for now
+    "cluster.set_permissions": _Cmd(
+        cmd=cluster.set_permissions,
+        required_permission=p.GRANT,
+    ),
     "cluster.setup": _Cmd(
         cmd=cluster.setup,
         required_permission=p.SUPERUSER,

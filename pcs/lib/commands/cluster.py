@@ -7,11 +7,7 @@ from typing import Any, Mapping, Optional, Sequence, Tuple, cast
 from lxml.etree import _Element
 
 from pcs import settings
-from pcs.common import (
-    file_type_codes,
-    reports,
-    ssl,
-)
+from pcs.common import file_type_codes, reports, ssl
 from pcs.common.corosync_conf import (
     CorosyncConfDto,
     CorosyncQuorumDeviceSettingsDto,
@@ -25,21 +21,14 @@ from pcs.common.node_communicator import (
 from pcs.common.permissions.types import SetPermissionDto
 from pcs.common.reports import ReportProcessor
 from pcs.common.reports import codes as report_codes
-from pcs.common.reports.item import (
-    ReportItem,
-    ReportItemList,
-)
+from pcs.common.reports.item import ReportItem, ReportItemList
 from pcs.common.str_tools import join_multilines
 from pcs.common.tools import format_os_error
 from pcs.common.types import (
     CorosyncTransportType,
     UnknownCorosyncTransportTypeException,
 )
-from pcs.lib import (
-    node_communication_format,
-    sbd,
-    validate,
-)
+from pcs.lib import node_communication_format, sbd, validate
 from pcs.lib.auth.types import AuthUser
 from pcs.lib.booth import sync as booth_sync
 from pcs.lib.cib import fencing_topology
@@ -103,15 +92,14 @@ from pcs.lib.pacemaker.live import (
 from pcs.lib.pacemaker.live import verify as verify_cmd
 from pcs.lib.pacemaker.state import ClusterState
 from pcs.lib.pacemaker.values import get_valid_timeout_seconds
-from pcs.lib.pcs_cfgsync.save_sync import (
-    save_sync_new_version,
-)
+from pcs.lib.pcs_cfgsync.save_sync import save_sync_new_version
 from pcs.lib.permissions.checker import (
     PermissionsChecker,
     _complete_access_list,
 )
 from pcs.lib.permissions.config.facade import FacadeV2 as PcsSettingsFacade
 from pcs.lib.permissions.config.types import (
+    ClusterPermissions,
     PermissionAccessType,
     PermissionEntry,
     PermissionTargetType,
@@ -2354,6 +2342,16 @@ def rename(
 
     new_name -- new name for the cluster
     """
+    env.report_processor.report(
+        reports.ReportItem.error(
+            reports.messages.PermissionDuplication(
+                [
+                    ("peter", PermissionTargetType.USER),
+                    ("jozef", PermissionTargetType.GROUP),
+                ]
+            )
+        )
+    )
 
     def warn_dlm_resources(resources: _Element) -> reports.ReportItemList:
         if find_primitives_by_agent(
@@ -2446,14 +2444,25 @@ def _validate_set_permissions(
 ) -> reports.ReportItemList:
     report_list: reports.ReportItemList = []
     user_set: set[tuple[str, PermissionTargetType]] = set()
+    duplicate_set: set[tuple[str, PermissionTargetType]] = set()
     for perm in permissions:
         if not perm.name:
-            # TODO error report about empty name
-            pass
+            report_list.append(
+                reports.ReportItem.error(
+                    reports.messages.InvalidOptionValue(
+                        "name", "", allowed_values=None, cannot_be_empty=True
+                    )
+                )
+            )
         if (perm.name, perm.type) in user_set:
-            # TODO error report about duplicate
-            pass
+            duplicate_set.add((perm.name, perm.type))
         user_set.add((perm.name, perm.type))
+    if duplicate_set:
+        report_list.append(
+            reports.ReportItem.error(
+                reports.messages.PermissionDuplication(sorted(duplicate_set))
+            )
+        )
     return report_list
 
 
@@ -2469,19 +2478,15 @@ def _validate_user_has_permissions_to_change_full_users(
         for entry in pcs_settings.get_permission_with_allow_full()
     }
     if new_full_users != old_full_users:
-        # TODO: The user login_login and user_groups are none when calling
-        # this command from cli through lib_wrapper -> this will always break
-        # we could put the values there though = name and groups of the user
-        # that launched the cli command
         if not permissions_checker.is_authorized(
             auth_user, PermissionAccessType.FULL, facade=pcs_settings
         ):
-            # TODO: error report -> only FULL users can add or remove FULL users
-            return []
+            # TODO: do we want a more specific report? That only users with FULL
+            # can add or remove FULL
+            return [reports.ReportItem.error(reports.messages.NotAuthorized())]
     return []
 
 
-# TODO: add to apiv2 (maybe the unoficial one) with permissions GRANT
 def set_permissions(
     env: LibraryEnvironment, permissions: Sequence[SetPermissionDto]
 ) -> None:
@@ -2502,34 +2507,34 @@ def set_permissions(
 
     is_in_cluster = FileInstance.for_corosync_conf().raw_file.exists()
 
-    # TODO: The user user_login and user_groups are None when calling
+    # TODO: The user_login and user_groups are None when calling
     # this command from cli through lib_wrapper -> this will break
-    # We could put set values though = name and groups of the user that launched
-    # the cli command
     auth_user = AuthUser(env.user_login or "", env.user_groups or [])
+
     permissions_checker = PermissionsChecker(env.logger)
+    pcs_settings, report_list = read_pcs_settings_conf()
+    if env.report_processor.report_list(report_list).has_errors:
+        raise LibraryError()
 
-    # Save the new permissions
-    if not is_in_cluster:
-        pcs_settings, report_list = read_pcs_settings_conf()
-        if env.report_processor.report_list(report_list).has_errors:
-            raise LibraryError()
-
-        if env.report_processor.report_list(
-            _validate_user_has_permissions_to_change_full_users(
-                pcs_settings, auth_user, new_full_users, permissions_checker
-            )
-        ).has_errors:
-            raise LibraryError()
-
-        __update_pcs_settings_locally(
-            pcs_settings, new_permission_list, env.report_processor
+    if env.report_processor.report_list(
+        _validate_user_has_permissions_to_change_full_users(
+            pcs_settings, auth_user, new_full_users, permissions_checker
         )
+    ).has_errors:
+        raise LibraryError()
+
+    # replace all of the the current permissions
+    pcs_settings.set_cluster_permissions(
+        ClusterPermissions(new_permission_list)
+    )
+
+    if not is_in_cluster:
+        __update_pcs_settings_locally(pcs_settings, env.report_processor)
         if env.report_processor.has_errors:
             raise LibraryError()
         return
 
-    # The node is in cluster, sync the new config to all nodes
+    # The node is in cluster, sync the updated config to cluster nodes
     corosync_conf = env.get_corosync_conf()
     local_cluster_name = corosync_conf.get_cluster_name()
     local_corosync_nodes, _ = get_existing_nodes_names(corosync_conf)
@@ -2538,46 +2543,23 @@ def set_permissions(
     )
     node_communicator = env.get_node_communicator_no_privilege_transition()
 
-    # backwards compatibility - conflict resolution
-    # If there is conflict on the first try, then we fetch the newest config
-    # from cluster, save it, and try to save the permissions again
-    for conflict_is_error in (False, True):
-        pcs_settings, report_list = read_pcs_settings_conf()
-        if env.report_processor.report_list(report_list).has_errors:
-            raise LibraryError()
-
-        if env.report_processor.report_list(
-            _validate_user_has_permissions_to_change_full_users(
-                pcs_settings, auth_user, new_full_users, permissions_checker
-            )
-        ).has_errors:
-            raise LibraryError()
-
-        successful = __sync_pcs_settings_in_cluster(
-            pcs_settings,
-            new_permission_list,
-            local_cluster_name,
-            request_targets,
-            node_communicator,
-            conflict_is_error,
-            env.report_processor,
-        )
-
-        if env.report_processor.has_errors:
-            raise LibraryError()
-        if successful:
-            return
+    # TODO: check if webui can hanlde the conflict error
+    __sync_pcs_settings_in_cluster(
+        pcs_settings,
+        local_cluster_name,
+        request_targets,
+        node_communicator,
+        env.report_processor,
+    )
+    if env.report_processor.has_errors:
+        raise LibraryError()
 
 
 def __update_pcs_settings_locally(
     pcs_settings: PcsSettingsFacade,
-    new_permission_list: Sequence[PermissionEntry],
     report_processor: reports.ReportProcessor,
 ) -> None:
-    for permission in new_permission_list:
-        pcs_settings.set_permission(permission)
     pcs_settings.set_data_version(pcs_settings.data_version + 1)
-
     try:
         FileInstance.for_pcs_settings_config().write_facade(
             pcs_settings, can_overwrite=True
@@ -2588,16 +2570,11 @@ def __update_pcs_settings_locally(
 
 def __sync_pcs_settings_in_cluster(
     pcs_settings: PcsSettingsFacade,
-    new_permission_list: Sequence[PermissionEntry],
     local_cluster_name: str,
     request_targets: Sequence[RequestTarget],
     node_communicator: Communicator,
-    conflict_is_error: bool,
     report_processor: reports.ReportProcessor,
-) -> bool:
-    for permission in new_permission_list:
-        pcs_settings.set_permission(permission)
-
+) -> None:
     conflict_detected, failed_nodes, new_file = save_sync_new_version(
         PCS_SETTINGS_CONF,
         pcs_settings,
@@ -2606,15 +2583,14 @@ def __sync_pcs_settings_in_cluster(
         node_communicator,
         report_processor,
         fetch_on_conflict=True,
-        reject_is_error=conflict_is_error,
+        reject_is_error=False,
     )
     if conflict_detected:
-        if conflict_is_error:
-            report_processor.report(
-                reports.ReportItem.error(
-                    reports.messages.PcsCfgsyncConflictRepeatAction()
-                )
+        report_processor.report(
+            reports.ReportItem.error(
+                reports.messages.PcsCfgsyncConflictRepeatAction()
             )
+        )
         try:
             if new_file is not None:
                 FileInstance.for_pcs_settings_config().write_facade(
@@ -2632,5 +2608,3 @@ def __sync_pcs_settings_in_cluster(
                 )
             )
         )
-
-    return not conflict_detected and not failed_nodes

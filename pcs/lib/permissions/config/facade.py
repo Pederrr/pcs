@@ -86,6 +86,9 @@ class FacadeV2(SyncVersionFacadeInterface):
             list(self.config.permissions.local_cluster) + [entry]
         )
 
+    def set_cluster_permissions(self, permissions: ClusterPermissions) -> None:
+        self._set_config(replace(self.config, permissions=permissions))
+
     def get_permission_with_allow_full(self) -> list[PermissionEntry]:
         return [
             entry
