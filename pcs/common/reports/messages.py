@@ -8945,7 +8945,7 @@ class PermissionDuplication(ReportItemMessage):
             "Permissions must be unique, duplicate permissions for {perms}"
         ).format(
             perms=", ".join(
-                f"{target_type}: {name}"
+                f"{target_type.value}: '{name}'"
                 for name, target_type in self.target_list
             )
         )
