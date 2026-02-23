@@ -8936,7 +8936,6 @@ class PermissionDuplication(ReportItemMessage):
     target_list -- list of info about duplicate permissions
     """
 
-    # TODO
     target_list: list[tuple[str, PermissionTargetType]]
     _code = codes.PERMISSION_DUPLICATION
 

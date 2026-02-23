@@ -6,6 +6,7 @@ from tornado.web import Finish
 from pcs.common import file_type_codes, reports
 from pcs.common.async_tasks.dto import CommandDto, CommandOptionsDto
 from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
+from pcs.common.permissions.types import PermissionAccessType
 from pcs.common.str_tools import format_list
 from pcs.daemon import log
 from pcs.daemon.app.api_v0_tools import (
@@ -23,6 +24,7 @@ from pcs.daemon.app.common import (
     get_legacy_desired_user_from_request,
 )
 from pcs.daemon.async_tasks.scheduler import Scheduler
+from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.tools import DesiredUser
 from pcs.lib.auth.types import AuthUser
 from pcs.lib.pcs_cfgsync.const import SYNCED_CONFIGS
@@ -267,18 +269,21 @@ class SetPermissionsHandler(_BaseApiV0Handler):
         except (json.JSONDecodeError, TypeError) as e:
             raise self._error("{'status': 'bad_json'}") from e
 
-        permissions = [
-            {
-                "name": perm.get("name", ""),
-                "type": perm.get("type", ""),
-                "allow": [
-                    perm_name
-                    for perm_name, enabled in perm.get("allow", {}).items()
-                    if enabled == "1"
-                ],
-            }
-            for perm in permissions_raw.get("permissions", {}).values()
-        ]
+        try:
+            permissions = [
+                {
+                    "name": perm.get("name", ""),
+                    "type": perm.get("type", ""),
+                    "allow": [
+                        perm_name
+                        for perm_name, enabled in perm.get("allow", {}).items()
+                        if enabled == "1"
+                    ],
+                }
+                for perm in permissions_raw.get("permissions", {}).values()
+            ]
+        except AttributeError as e:
+            raise self._error("{'status': 'bad_json'}") from e
 
         result = await self._run_library_command(
             "cluster.set_permissions", {"permissions": permissions}
@@ -288,9 +293,16 @@ class SetPermissionsHandler(_BaseApiV0Handler):
             rep.message.code == reports.codes.NOT_AUTHORIZED
             for rep in result.reports
         ):
-            self._error("", 403)
+            full_label = PermissionAccessType.FULL.value
+            raise self._error(
+                http_code=403,
+                message=(
+                    "Permission denied\n"
+                    f"Only {SUPERUSER} and users with {full_label} permission "
+                    "can grant or revoke {full_label} permission."
+                ),
+            )
 
-        # TODO 403 when the FULL permissions error
         if not result.success:
             raise self._error(reports_to_str(result.reports))
         self.write("Permissions saved")

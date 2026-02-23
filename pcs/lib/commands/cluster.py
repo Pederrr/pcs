@@ -18,7 +18,7 @@ from pcs.common.node_communicator import (
     HostNotFound,
     RequestTarget,
 )
-from pcs.common.permissions.types import SetPermissionDto
+from pcs.common.permissions.types import SetPermissionsDto
 from pcs.common.reports import ReportProcessor
 from pcs.common.reports import codes as report_codes
 from pcs.common.reports.item import ReportItem, ReportItemList
@@ -2342,16 +2342,6 @@ def rename(
 
     new_name -- new name for the cluster
     """
-    env.report_processor.report(
-        reports.ReportItem.error(
-            reports.messages.PermissionDuplication(
-                [
-                    ("peter", PermissionTargetType.USER),
-                    ("jozef", PermissionTargetType.GROUP),
-                ]
-            )
-        )
-    )
 
     def warn_dlm_resources(resources: _Element) -> reports.ReportItemList:
         if find_primitives_by_agent(
@@ -2438,58 +2428,15 @@ def rename(
     env.push_corosync_conf(corosync_conf, skip_offline)
 
 
-# TODO: move to more appropriate module
-def _validate_set_permissions(
-    permissions: Sequence[SetPermissionDto],
-) -> reports.ReportItemList:
-    report_list: reports.ReportItemList = []
-    user_set: set[tuple[str, PermissionTargetType]] = set()
-    duplicate_set: set[tuple[str, PermissionTargetType]] = set()
-    for perm in permissions:
-        if not perm.name:
-            report_list.append(
-                reports.ReportItem.error(
-                    reports.messages.InvalidOptionValue(
-                        "name", "", allowed_values=None, cannot_be_empty=True
-                    )
-                )
-            )
-        if (perm.name, perm.type) in user_set:
-            duplicate_set.add((perm.name, perm.type))
-        user_set.add((perm.name, perm.type))
-    if duplicate_set:
-        report_list.append(
-            reports.ReportItem.error(
-                reports.messages.PermissionDuplication(sorted(duplicate_set))
-            )
-        )
-    return report_list
-
-
-# TODO: maybe move to the permissions.checker module
-def _validate_user_has_permissions_to_change_full_users(
-    pcs_settings: PcsSettingsFacade,
-    auth_user: AuthUser,
-    new_full_users: set[tuple[str, PermissionTargetType]],
-    permissions_checker: PermissionsChecker,
-) -> reports.ReportItemList:
-    old_full_users = {
-        (entry.name, entry.type)
-        for entry in pcs_settings.get_permission_with_allow_full()
-    }
-    if new_full_users != old_full_users:
-        if not permissions_checker.is_authorized(
-            auth_user, PermissionAccessType.FULL, facade=pcs_settings
-        ):
-            # TODO: do we want a more specific report? That only users with FULL
-            # can add or remove FULL
-            return [reports.ReportItem.error(reports.messages.NotAuthorized())]
-    return []
-
-
 def set_permissions(
-    env: LibraryEnvironment, permissions: Sequence[SetPermissionDto]
+    env: LibraryEnvironment, permissions: Sequence[SetPermissionsDto]
 ) -> None:
+    """
+    Replace the current local cluster permissions with provided permissions. If
+    local node is in cluster, synchronize the updated pcs_settings file.
+
+    permissions -- new permissions for the local cluster
+    """
     _validate_set_permissions(permissions)
 
     new_full_users = set()
@@ -2534,7 +2481,7 @@ def set_permissions(
             raise LibraryError()
         return
 
-    # The node is in cluster, sync the updated config to cluster nodes
+    # the node is in cluster, sync the updated config to cluster nodes
     corosync_conf = env.get_corosync_conf()
     local_cluster_name = corosync_conf.get_cluster_name()
     local_corosync_nodes, _ = get_existing_nodes_names(corosync_conf)
@@ -2543,7 +2490,6 @@ def set_permissions(
     )
     node_communicator = env.get_node_communicator_no_privilege_transition()
 
-    # TODO: check if webui can hanlde the conflict error
     __sync_pcs_settings_in_cluster(
         pcs_settings,
         local_cluster_name,
@@ -2553,6 +2499,51 @@ def set_permissions(
     )
     if env.report_processor.has_errors:
         raise LibraryError()
+
+
+def _validate_set_permissions(
+    permissions: Sequence[SetPermissionsDto],
+) -> reports.ReportItemList:
+    report_list: reports.ReportItemList = []
+    user_set: set[tuple[str, PermissionTargetType]] = set()
+    duplicate_set: set[tuple[str, PermissionTargetType]] = set()
+    for perm in permissions:
+        if not perm.name:
+            report_list.append(
+                reports.ReportItem.error(
+                    reports.messages.InvalidOptionValue(
+                        "name", "", allowed_values=None, cannot_be_empty=True
+                    )
+                )
+            )
+        if (perm.name, perm.type) in user_set:
+            duplicate_set.add((perm.name, perm.type))
+        user_set.add((perm.name, perm.type))
+    if duplicate_set:
+        report_list.append(
+            reports.ReportItem.error(
+                reports.messages.PermissionDuplication(sorted(duplicate_set))
+            )
+        )
+    return report_list
+
+
+def _validate_user_has_permissions_to_change_full_users(
+    pcs_settings: PcsSettingsFacade,
+    auth_user: AuthUser,
+    new_full_users: set[tuple[str, PermissionTargetType]],
+    permissions_checker: PermissionsChecker,
+) -> reports.ReportItemList:
+    old_full_users = {
+        (entry.name, entry.type)
+        for entry in pcs_settings.get_permission_with_allow_full()
+    }
+    if new_full_users != old_full_users:
+        if not permissions_checker.is_authorized(
+            auth_user, PermissionAccessType.FULL, facade=pcs_settings
+        ):
+            return [reports.ReportItem.error(reports.messages.NotAuthorized())]
+    return []
 
 
 def __update_pcs_settings_locally(

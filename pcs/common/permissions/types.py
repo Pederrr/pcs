@@ -19,9 +19,8 @@ class PermissionAccessType(str, Enum):
     SUPERUSER = "superuser"
 
 
-# TODO, we might just move the PermissionEntry from lib.permissions.config.types here, and make Dto from it
 @dataclass(frozen=True)
-class SetPermissionDto:
+class SetPermissionsDto:
     name: str
     type: PermissionTargetType
     allow: Collection[PermissionAccessType]
