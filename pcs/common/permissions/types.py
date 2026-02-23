@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Collection
 
-# from pcs.common.interface.dto import DataTransferObject
-
 
 class PermissionTargetType(str, Enum):
     USER = "user"

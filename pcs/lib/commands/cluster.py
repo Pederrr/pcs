@@ -95,7 +95,8 @@ from pcs.lib.pacemaker.values import get_valid_timeout_seconds
 from pcs.lib.pcs_cfgsync.save_sync import save_sync_new_version
 from pcs.lib.permissions.checker import (
     PermissionsChecker,
-    _complete_access_list,
+    complete_access_list,
+    get_local_cluster_permission_entries_with_allow_full,
 )
 from pcs.lib.permissions.config.facade import FacadeV2 as PcsSettingsFacade
 from pcs.lib.permissions.config.types import (
@@ -2450,7 +2451,7 @@ def set_permissions(
         # Explicitly save dependant permissions. That way if the dependency is
         # changed in the future, it won't revoke permissions which were once
         # granted
-        allow = _complete_access_list(set(perm.allow))
+        allow = complete_access_list(set(perm.allow))
         new_permission_list.append(
             PermissionEntry(name=perm.name, type=perm.type, allow=sorted(allow))
         )
@@ -2538,7 +2539,9 @@ def _validate_user_has_permissions_to_change_full_users(
 ) -> reports.ReportItemList:
     old_full_users = {
         (entry.name, entry.type)
-        for entry in pcs_settings.get_permission_with_allow_full()
+        for entry in get_local_cluster_permission_entries_with_allow_full(
+            pcs_settings
+        )
     }
     if new_full_users != old_full_users:
         if not permissions_checker.is_authorized(

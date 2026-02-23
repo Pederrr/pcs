@@ -10,11 +10,15 @@ from pcs.lib.interface.config import ParserErrorException
 
 from .config.facade import FacadeV2
 from .config.parser import ParserError
-from .config.types import PermissionAccessType, PermissionTargetType
+from .config.types import (
+    PermissionAccessType,
+    PermissionEntry,
+    PermissionTargetType,
+)
 from .const import DEFAULT_PERMISSIONS
 
 
-def _complete_access_list(
+def complete_access_list(
     access_list: Collection[PermissionAccessType],
 ) -> set[PermissionAccessType]:
     if PermissionAccessType.SUPERUSER in access_list:
@@ -30,6 +34,16 @@ def _complete_access_list(
     if PermissionAccessType.WRITE in access_list:
         return new | {PermissionAccessType.READ}
     return new
+
+
+def get_local_cluster_permission_entries_with_allow_full(
+    facade: FacadeV2,
+) -> list[PermissionEntry]:
+    return [
+        entry
+        for entry in facade.config.permissions.local_cluster
+        if PermissionAccessType.FULL in complete_access_list(entry.allow)
+    ]
 
 
 class PermissionsChecker:
@@ -74,7 +88,7 @@ class PermissionsChecker:
         self, auth_user: AuthUser, facade: Optional[FacadeV2] = None
     ) -> set[PermissionAccessType]:
         if auth_user.username == SUPERUSER:
-            return _complete_access_list((PermissionAccessType.SUPERUSER,))
+            return complete_access_list((PermissionAccessType.SUPERUSER,))
         facade = facade if facade is not None else self._get_facade()
         all_permissions: set[PermissionAccessType] = set()
         for target_name, target_type in [
@@ -83,7 +97,7 @@ class PermissionsChecker:
             entry = facade.get_entry(target_name, target_type)
             if entry:
                 all_permissions |= set(entry.allow)
-        return _complete_access_list(all_permissions)
+        return complete_access_list(all_permissions)
 
     def is_authorized(
         self,
