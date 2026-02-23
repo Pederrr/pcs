@@ -2437,7 +2437,10 @@ def set_permissions(
 
     permissions -- new permissions for the local cluster
     """
-    _validate_set_permissions(permissions)
+    if env.report_processor.report_list(
+        _validate_set_permissions(permissions)
+    ).has_errors:
+        raise LibraryError()
 
     new_full_users = set()
     new_permission_list = []
@@ -2451,8 +2454,6 @@ def set_permissions(
         new_permission_list.append(
             PermissionEntry(name=perm.name, type=perm.type, allow=sorted(allow))
         )
-
-    is_in_cluster = FileInstance.for_corosync_conf().raw_file.exists()
 
     # TODO: The user_login and user_groups are None when calling
     # this command from cli through lib_wrapper -> this will break
@@ -2475,6 +2476,7 @@ def set_permissions(
         ClusterPermissions(new_permission_list)
     )
 
+    is_in_cluster = FileInstance.for_corosync_conf().raw_file.exists()
     if not is_in_cluster:
         __update_pcs_settings_locally(pcs_settings, env.report_processor)
         if env.report_processor.has_errors:
@@ -2574,7 +2576,7 @@ def __sync_pcs_settings_in_cluster(
         node_communicator,
         report_processor,
         fetch_on_conflict=True,
-        reject_is_error=False,
+        reject_is_error=True,
     )
     if conflict_detected:
         report_processor.report(

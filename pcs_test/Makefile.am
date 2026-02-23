@@ -286,6 +286,7 @@ EXTRA_DIST		= \
 			  tier0/lib/commands/cluster_property/test_set_properties.py \
 			  tier0/lib/commands/cluster_property/test_set_properties_stonith_watchdog_timeout.py \
 			  tier0/lib/commands/cluster/test_rename.py \
+			  tier0/lib/commands/cluster/test_set_permissions.py \
 			  tier0/lib/commands/cluster/test_setup.py \
 			  tier0/lib/commands/cluster/test_update_link.py \
 			  tier0/lib/commands/cluster/test_verify.py \
