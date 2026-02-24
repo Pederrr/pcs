@@ -1,5 +1,5 @@
 from dataclasses import replace
-from typing import Optional, cast
+from typing import Optional, Sequence, cast
 
 from pcs.lib.interface.config import SyncVersionFacadeInterface
 
@@ -84,6 +84,9 @@ class FacadeV2(SyncVersionFacadeInterface):
         self._set_permissions(
             list(self.config.permissions.local_cluster) + [entry]
         )
+
+    def set_cluster_permissions(self, permissions: ClusterPermissions) -> None:
+        self._set_config(replace(self.config, permissions=permissions))
 
     def is_cluster_name_in_use(self, cluster_name: str) -> bool:
         return any(

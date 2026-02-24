@@ -21,6 +21,7 @@ from pcs.common.fencing_topology import (
     FencingTargetValue,
 )
 from pcs.common.file import FileAction, RawFileError
+from pcs.common.permissions.types import PermissionTargetType
 from pcs.common.resource_agent.dto import (
     ResourceAgentNameDto,
     get_resource_agent_full_name,
@@ -9046,3 +9047,26 @@ class UnableToGetClusterKnownHosts(ReportItemMessage):
     @property
     def message(self) -> str:
         return f"Unable to get known hosts from cluster '{self.cluster_name}'"
+
+
+@dataclass(frozen=True)
+class PermissionDuplication(ReportItemMessage):
+    """
+    Trying to set different permissions for the same users or groups
+
+    target_list -- list of info about duplicate permissions
+    """
+
+    target_list: list[tuple[str, PermissionTargetType]]
+    _code = codes.PERMISSION_DUPLICATION
+
+    @property
+    def message(self) -> str:
+        return (
+            "Permissions must be unique, duplicate permissions for {perms}"
+        ).format(
+            perms=", ".join(
+                f"{target_type.value}: '{name}'"
+                for name, target_type in self.target_list
+            )
+        )

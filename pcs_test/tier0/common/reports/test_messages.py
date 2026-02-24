@@ -8,6 +8,7 @@ from pcs.common.fencing_topology import (
     TARGET_TYPE_REGEXP,
 )
 from pcs.common.file import RawFileError
+from pcs.common.permissions.types import PermissionTargetType
 from pcs.common.reports import const
 from pcs.common.reports import messages as reports
 from pcs.common.resource_agent.dto import ResourceAgentNameDto
@@ -6731,4 +6732,20 @@ class UnableToGetClusterKnownHosts(NameBuildTest):
         self.assert_message_from_report(
             "Unable to get known hosts from cluster 'foo'",
             reports.UnableToGetClusterKnownHosts("foo"),
+        )
+
+
+class PermissionDuplication(NameBuildTest):
+    def test_success(self):
+        self.assert_message_from_report(
+            (
+                "Permissions must be unique, duplicate permissions for "
+                "user: 'john', group: 'haclient'"
+            ),
+            reports.PermissionDuplication(
+                [
+                    ("john", PermissionTargetType.USER),
+                    ("haclient", PermissionTargetType.GROUP),
+                ]
+            ),
         )

@@ -160,6 +160,10 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
         cmd=cluster.rename_node_cib,
         required_permission=p.WRITE,
     ),
+    "cluster.set_permissions": _Cmd(
+        cmd=cluster.set_permissions,
+        required_permission=p.GRANT,
+    ),
     "cluster.setup": _Cmd(
         cmd=cluster.setup,
         required_permission=p.SUPERUSER,
@@ -481,6 +485,7 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
 
 
 LEGACY_API_COMMANDS = (
+    "cluster.set_permissions",
     "qdevice.qdevice_net_get_ca_certificate",
     "resource_agent.describe_agent",
     "resource_agent.list_agents",

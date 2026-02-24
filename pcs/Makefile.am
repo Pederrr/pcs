@@ -173,6 +173,7 @@ EXTRA_DIST		= \
 			  common/pacemaker/tools.py \
 			  common/pacemaker/types.py \
 			  common/pcs_cfgsync_dto.py \
+			  common/permissions/dto.py \
 			  common/permissions/__init__.py \
 			  common/permissions/types.py \
 			  common/pcs_pycurl.py \
