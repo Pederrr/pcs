@@ -1,16 +1,8 @@
 import logging
-from typing import (
-    Collection,
-    Sequence,
-    Set,
-    cast,
-)
+from typing import Collection, Optional, cast
 
 from pcs.common.file import RawFileError
-from pcs.lib.auth.const import (
-    ADMIN_GROUP,
-    SUPERUSER,
-)
+from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
 from pcs.lib.file.instance import FileInstance
 from pcs.lib.file.json import JsonParserException
@@ -19,8 +11,6 @@ from pcs.lib.interface.config import ParserErrorException
 from .config.facade import FacadeV2
 from .config.parser import ParserError
 from .config.types import (
-    ClusterPermissions,
-    ConfigV2,
     PermissionAccessType,
     PermissionEntry,
     PermissionTargetType,
@@ -28,21 +18,9 @@ from .config.types import (
 from .const import DEFAULT_PERMISSIONS
 
 
-def _get_empty_facade(permissions: Sequence[PermissionEntry]) -> FacadeV2:
-    return FacadeV2(
-        ConfigV2(
-            data_version=1,
-            clusters=[],
-            permissions=ClusterPermissions(
-                local_cluster=permissions,
-            ),
-        )
-    )
-
-
-def _complete_access_list(
+def complete_access_list(
     access_list: Collection[PermissionAccessType],
-) -> Set[PermissionAccessType]:
+) -> set[PermissionAccessType]:
     if PermissionAccessType.SUPERUSER in access_list:
         return set(PermissionAccessType)
     if PermissionAccessType.FULL in access_list:
@@ -56,6 +34,16 @@ def _complete_access_list(
     if PermissionAccessType.WRITE in access_list:
         return new | {PermissionAccessType.READ}
     return new
+
+
+def get_local_cluster_permission_entries_with_allow_full(
+    facade: FacadeV2,
+) -> list[PermissionEntry]:
+    return [
+        entry
+        for entry in facade.config.permissions.local_cluster
+        if PermissionAccessType.FULL in complete_access_list(entry.allow)
+    ]
 
 
 class PermissionsChecker:
@@ -96,21 +84,26 @@ class PermissionsChecker:
             )
         return FacadeV2.create()
 
-    def get_permissions(self, auth_user: AuthUser) -> Set[PermissionAccessType]:
+    def get_permissions(
+        self, auth_user: AuthUser, facade: Optional[FacadeV2] = None
+    ) -> set[PermissionAccessType]:
         if auth_user.username == SUPERUSER:
-            return _complete_access_list((PermissionAccessType.SUPERUSER,))
-        facade = self._get_facade()
-        all_permissions: Set[PermissionAccessType] = set()
+            return complete_access_list((PermissionAccessType.SUPERUSER,))
+        facade = facade if facade is not None else self._get_facade()
+        all_permissions: set[PermissionAccessType] = set()
         for target_name, target_type in [
             (auth_user.username, PermissionTargetType.USER)
         ] + [(group, PermissionTargetType.GROUP) for group in auth_user.groups]:
             entry = facade.get_entry(target_name, target_type)
             if entry:
                 all_permissions |= set(entry.allow)
-        return _complete_access_list(all_permissions)
+        return complete_access_list(all_permissions)
 
     def is_authorized(
-        self, auth_user: AuthUser, access: PermissionAccessType
+        self,
+        auth_user: AuthUser,
+        access: PermissionAccessType,
+        facade: Optional[FacadeV2] = None,
     ) -> bool:
         self._logger.debug(
             "Permission check: username=%s groups=%s access=%s",
@@ -121,7 +114,7 @@ class PermissionsChecker:
         if access is PermissionAccessType.UNRESTRICTED:
             result = True
         else:
-            user_permissions = self.get_permissions(auth_user)
+            user_permissions = self.get_permissions(auth_user, facade)
             self._logger.debug(
                 "Current user permissions: %s",
                 ",".join(
