@@ -6,6 +6,7 @@ from tornado.web import Finish
 from pcs.common import file_type_codes, reports
 from pcs.common.async_tasks.dto import CommandDto, CommandOptionsDto
 from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
+from pcs.common.permissions.types import PermissionAccessType
 from pcs.common.str_tools import format_list
 from pcs.daemon import log
 from pcs.daemon.app.api_v0_tools import (
@@ -23,6 +24,7 @@ from pcs.daemon.app.common import (
     get_legacy_desired_user_from_request,
 )
 from pcs.daemon.async_tasks.scheduler import Scheduler
+from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.tools import DesiredUser
 from pcs.lib.auth.types import AuthUser
 from pcs.lib.pcs_cfgsync.const import SYNCED_CONFIGS
@@ -237,6 +239,75 @@ class GetConfigsHandler(_BaseApiV0Handler):
         self.write(legacy_result)
 
 
+class SetPermissionsHandler(_BaseApiV0Handler):
+    """
+    Input format:
+    {
+        "cluster_name": "name" # ignored
+        "cluster": "name" # ignored
+        "permissions": {
+            "arbitrary-key": {
+                "name": "username",
+                "type": "user|group",
+                "allow": {
+                    "read": "1",
+                    "write": "1",
+                    "grant": "1",
+                    "full": "1",
+                }
+            }
+        }
+    }
+    """
+
+    async def _handle_request(self) -> None:
+        data_json = self.get_argument("json_data", "")
+
+        permissions = []
+        try:
+            permissions_raw = json.loads(data_json)
+        except (json.JSONDecodeError, TypeError) as e:
+            raise self._error("{'status': 'bad_json'}") from e
+
+        try:
+            permissions = [
+                {
+                    "name": perm.get("name", ""),
+                    "type": perm.get("type", ""),
+                    "allow": [
+                        perm_name
+                        for perm_name, enabled in perm.get("allow", {}).items()
+                        if enabled == "1"
+                    ],
+                }
+                for perm in permissions_raw.get("permissions", {}).values()
+            ]
+        except AttributeError as e:
+            raise self._error("{'status': 'bad_json'}") from e
+
+        result = await self._run_library_command(
+            "cluster.set_permissions", {"permissions": permissions}
+        )
+
+        if any(
+            rep.message.code == reports.codes.NOT_AUTHORIZED
+            for rep in result.reports
+        ):
+            full_label = PermissionAccessType.FULL.value
+            raise self._error(
+                http_code=403,
+                message=(
+                    "Permission denied\n"
+                    f"Only {SUPERUSER} and users with {full_label} permission "
+                    f"can grant or revoke {full_label} permission."
+                ),
+            )
+
+        if not result.success:
+            raise self._error(reports_to_str(result.reports))
+        self.write("Permissions saved")
+
+
 def get_routes(
     api_auth_provider_factory: ApiAuthProviderFactoryInterface,
     scheduler: Scheduler,
@@ -282,4 +353,6 @@ def get_routes(
         ),
         # cfgsync
         (r("get_configs"), GetConfigsHandler, params),
+        # permissions
+        (r("set_permissions"), SetPermissionsHandler, params),
     ]
