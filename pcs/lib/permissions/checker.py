@@ -1,21 +1,16 @@
 import logging
-from typing import Collection, Optional, cast
+from typing import Collection, Optional
 
-from pcs.common.file import RawFileError
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
-from pcs.lib.file.instance import FileInstance
-from pcs.lib.file.json import JsonParserException
-from pcs.lib.interface.config import ParserErrorException
 
 from .config.facade import FacadeV2
-from .config.parser import ParserError
 from .config.types import (
     PermissionAccessType,
     PermissionEntry,
     PermissionTargetType,
 )
-from .const import DEFAULT_PERMISSIONS
+from .tools import read_pcs_settings_conf
 
 
 def complete_access_list(
@@ -49,47 +44,17 @@ def get_local_cluster_permission_entries_with_allow_full(
 class PermissionsChecker:
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
-        self._config_file_instance = FileInstance.for_pcs_settings_config()
-
-    def _get_facade(self) -> FacadeV2:
-        if not self._config_file_instance.raw_file.exists():
-            self._logger.debug(
-                "File '%s' doesn't exist, using default configuration",
-                self._config_file_instance.raw_file.metadata.path,
-            )
-            return FacadeV2.create(permissions=DEFAULT_PERMISSIONS)
-        try:
-            return cast(FacadeV2, self._config_file_instance.read_to_facade())
-        except ParserError as e:
-            self._logger.error(
-                "Unable to parse file '%s': %s",
-                self._config_file_instance.raw_file.metadata.path,
-                e.msg,
-            )
-        except JsonParserException:
-            self._logger.error(
-                "Unable to parse file '%s': not valid json",
-                self._config_file_instance.raw_file.metadata.path,
-            )
-        except ParserErrorException:
-            self._logger.error(
-                "Unable to parse file '%s'",
-                self._config_file_instance.raw_file.metadata.path,
-            )
-        except RawFileError as e:
-            self._logger.error(
-                "Unable to read file '%s': %s",
-                self._config_file_instance.raw_file.metadata.path,
-                e.reason,
-            )
-        return FacadeV2.create()
 
     def get_permissions(
         self, auth_user: AuthUser, facade: Optional[FacadeV2] = None
     ) -> set[PermissionAccessType]:
         if auth_user.username == SUPERUSER:
             return complete_access_list((PermissionAccessType.SUPERUSER,))
-        facade = facade if facade is not None else self._get_facade()
+        facade = (
+            facade
+            if facade is not None
+            else read_pcs_settings_conf(self._logger)[0]
+        )
         all_permissions: set[PermissionAccessType] = set()
         for target_name, target_type in [
             (auth_user.username, PermissionTargetType.USER)
