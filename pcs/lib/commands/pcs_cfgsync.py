@@ -1,4 +1,4 @@
-from typing import Mapping, cast
+from typing import Callable, Mapping, cast
 
 from pcs.common import reports
 from pcs.common.file import RawFileError
@@ -48,6 +48,16 @@ def get_configs(env: LibraryEnvironment, cluster_name: str) -> SyncConfigsDto:
     return SyncConfigsDto(current_cluster_name, configs)
 
 
+UPDATE_SYNC_OPTIONS_ACTIONS: dict[
+    str, Callable[[CfgsyncCtlFacade, str], None]
+] = {
+    "sync_thread_enable": lambda facade, value: facade.enable_sync(),
+    "sync_thread_disable": lambda facade, value: facade.disable_sync(),
+    "sync_thread_resume": lambda facade, value: facade.resume_sync(),
+    "sync_thread_pause": lambda facade, value: facade.pause_sync(int(value)),
+}
+
+
 def update_sync_options(
     env: LibraryEnvironment, options: Mapping[str, str]
 ) -> None:
@@ -79,16 +89,10 @@ def update_sync_options(
     if env.report_processor.has_errors:
         raise LibraryError()
 
-    actions = {
-        "sync_thread_enable": lambda: cfgsync_ctl_facade.enable_sync(),
-        "sync_thread_disable": lambda: cfgsync_ctl_facade.disable_sync(),
-        "sync_thread_resume": lambda: cfgsync_ctl_facade.resume_sync(),
-        "sync_thread_pause": lambda: cfgsync_ctl_facade.pause_sync(
-            int(options["sync_thread_pause"])
-        ),
-    }
-    for option in options:
-        actions[option]()
+    for option_name, option_value in options.items():
+        UPDATE_SYNC_OPTIONS_ACTIONS[option_name](
+            cfgsync_ctl_facade, option_value
+        )
 
     try:
         cfgsync_ctl_instance.write_facade(
