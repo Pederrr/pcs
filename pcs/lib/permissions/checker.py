@@ -1,74 +1,60 @@
 import logging
-from typing import Collection, Optional
+from typing import Collection
 
+from pcs.common.permissions.types import (
+    PermissionTargetType,
+)
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
 
-from .config.facade import FacadeV2
-from .config.types import (
-    PermissionAccessType,
-    PermissionEntry,
-    PermissionTargetType,
-)
-from .tools import read_pcs_settings_conf
+from .file_tools import read_pcs_settings_conf
+from .types import PermissionCheckAccessType
 
 
-def complete_access_list(
-    access_list: Collection[PermissionAccessType],
-) -> set[PermissionAccessType]:
-    if PermissionAccessType.SUPERUSER in access_list:
-        return set(PermissionAccessType)
-    if PermissionAccessType.FULL in access_list:
+def _complete_access_list(
+    access_list: Collection[PermissionCheckAccessType],
+) -> set[PermissionCheckAccessType]:
+    if PermissionCheckAccessType.SUPERUSER in access_list:
+        return set(PermissionCheckAccessType) - {PermissionCheckAccessType.NONE}
+    if PermissionCheckAccessType.FULL in access_list:
         return {
-            PermissionAccessType.READ,
-            PermissionAccessType.WRITE,
-            PermissionAccessType.GRANT,
-            PermissionAccessType.FULL,
+            PermissionCheckAccessType.READ,
+            PermissionCheckAccessType.WRITE,
+            PermissionCheckAccessType.GRANT,
+            PermissionCheckAccessType.FULL,
         }
     new = set(access_list)
-    if PermissionAccessType.WRITE in access_list:
-        return new | {PermissionAccessType.READ}
+    if PermissionCheckAccessType.WRITE in access_list:
+        return new | {PermissionCheckAccessType.READ}
     return new
-
-
-def get_local_cluster_permission_entries_with_allow_full(
-    facade: FacadeV2,
-) -> list[PermissionEntry]:
-    return [
-        entry
-        for entry in facade.config.permissions.local_cluster
-        if PermissionAccessType.FULL in complete_access_list(entry.allow)
-    ]
 
 
 class PermissionsChecker:
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
 
-    def get_permissions(
-        self, auth_user: AuthUser, facade: Optional[FacadeV2] = None
-    ) -> set[PermissionAccessType]:
+    def _get_permissions(
+        self,
+        auth_user: AuthUser,
+    ) -> set[PermissionCheckAccessType]:
         if auth_user.username == SUPERUSER:
-            return complete_access_list((PermissionAccessType.SUPERUSER,))
-        facade = (
-            facade
-            if facade is not None
-            else read_pcs_settings_conf(self._logger)[0]
-        )
-        all_permissions: set[PermissionAccessType] = set()
+            return _complete_access_list((PermissionCheckAccessType.SUPERUSER,))
+
+        facade = read_pcs_settings_conf(self._logger)[0]
+        all_permissions = set()
         for target_name, target_type in [
             (auth_user.username, PermissionTargetType.USER)
         ] + [(group, PermissionTargetType.GROUP) for group in auth_user.groups]:
             entry = facade.get_entry(target_name, target_type)
             if entry:
-                all_permissions |= set(entry.allow)
-        return complete_access_list(all_permissions)
+                all_permissions |= {
+                    PermissionCheckAccessType.from_permission_access_type(allow)
+                    for allow in entry.allow
+                }
+        return _complete_access_list(all_permissions)
 
     def is_authorized(
-        self,
-        auth_user: AuthUser,
-        access: PermissionAccessType,
-        facade: Optional[FacadeV2] = None,
+        self, auth_user: AuthUser, access: PermissionCheckAccessType
     ) -> bool:
         self._logger.debug(
             "Permission check: username=%s groups=%s access=%s",
@@ -76,10 +62,11 @@ class PermissionsChecker:
             ",".join(auth_user.groups),
             str(access.value),
         )
-        if access is PermissionAccessType.UNRESTRICTED:
+        if access is PermissionCheckAccessType.NONE:
+            # We dont need to read the permissions file in this case
             result = True
         else:
-            user_permissions = self.get_permissions(auth_user, facade)
+            user_permissions = self._get_permissions(auth_user)
             self._logger.debug(
                 "Current user permissions: %s",
                 ",".join(

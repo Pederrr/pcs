@@ -3,10 +3,7 @@ from unittest import TestCase, mock
 
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
-from pcs.lib.permissions.checker import (
-    PermissionsChecker,
-    get_local_cluster_permission_entries_with_allow_full,
-)
+from pcs.lib.permissions.checker import PermissionsChecker
 from pcs.lib.permissions.config.facade import FacadeV2
 from pcs.lib.permissions.config.types import (
     ClusterPermissions,
@@ -15,6 +12,7 @@ from pcs.lib.permissions.config.types import (
     PermissionEntry,
     PermissionTargetType,
 )
+from pcs.lib.permissions.types import PermissionCheckAccessType
 
 
 def _config_fixture(permissions=tuple()):
@@ -53,9 +51,6 @@ _FACADE_FIXTURE = FacadeV2(
 )
 
 
-_EMPTY_CONFIG = _config_fixture()
-
-
 @mock.patch(
     "pcs.lib.permissions.checker.read_pcs_settings_conf",
     lambda _logger: (_FACADE_FIXTURE, []),
@@ -67,8 +62,14 @@ class PermissionCheckerGetPermissions(TestCase):
 
     def test_superuser(self):
         self.assertEqual(
-            set(PermissionAccessType),
-            self.checker.get_permissions(
+            {
+                PermissionCheckAccessType.READ,
+                PermissionCheckAccessType.WRITE,
+                PermissionCheckAccessType.GRANT,
+                PermissionCheckAccessType.FULL,
+                PermissionCheckAccessType.SUPERUSER,
+            },
+            self.checker._get_permissions(
                 AuthUser(username=SUPERUSER, groups=tuple())
             ),
         )
@@ -76,12 +77,12 @@ class PermissionCheckerGetPermissions(TestCase):
     def test_completion_full(self):
         self.assertEqual(
             {
-                PermissionAccessType.READ,
-                PermissionAccessType.WRITE,
-                PermissionAccessType.GRANT,
-                PermissionAccessType.FULL,
+                PermissionCheckAccessType.READ,
+                PermissionCheckAccessType.WRITE,
+                PermissionCheckAccessType.GRANT,
+                PermissionCheckAccessType.FULL,
             },
-            self.checker.get_permissions(
+            self.checker._get_permissions(
                 AuthUser(username="user-full", groups=tuple())
             ),
         )
@@ -89,18 +90,18 @@ class PermissionCheckerGetPermissions(TestCase):
     def test_completion_write(self):
         self.assertEqual(
             {
-                PermissionAccessType.READ,
-                PermissionAccessType.WRITE,
+                PermissionCheckAccessType.READ,
+                PermissionCheckAccessType.WRITE,
             },
-            self.checker.get_permissions(
+            self.checker._get_permissions(
                 AuthUser(username="user-write", groups=tuple())
             ),
         )
 
     def test_groups_permissions(self):
         self.assertEqual(
-            {PermissionAccessType.GRANT},
-            self.checker.get_permissions(
+            {PermissionCheckAccessType.GRANT},
+            self.checker._get_permissions(
                 AuthUser(username="user", groups=("group-grant",))
             ),
         )
@@ -108,31 +109,12 @@ class PermissionCheckerGetPermissions(TestCase):
     def test_user_and_groups_permissions(self):
         self.assertEqual(
             {
-                PermissionAccessType.READ,
-                PermissionAccessType.WRITE,
-                PermissionAccessType.GRANT,
+                PermissionCheckAccessType.READ,
+                PermissionCheckAccessType.WRITE,
+                PermissionCheckAccessType.GRANT,
             },
-            self.checker.get_permissions(
+            self.checker._get_permissions(
                 AuthUser(username="user-write", groups=("group-grant",))
-            ),
-        )
-
-    def test_use_provided_facade(self):
-        facade = FacadeV2(
-            _config_fixture(
-                (
-                    PermissionEntry(
-                        name="user",
-                        type=PermissionTargetType.USER,
-                        allow=(PermissionAccessType.READ,),
-                    ),
-                )
-            )
-        )
-        self.assertEqual(
-            {PermissionAccessType.READ},
-            self.checker.get_permissions(
-                AuthUser(username="user", groups=[]), facade=facade
             ),
         )
 
@@ -148,7 +130,7 @@ class PermissionsCheckerIsAuthorizedTest(TestCase):
 
     def test_allowed(self):
         user = AuthUser("user-full", ("group1", "group2"))
-        access = PermissionAccessType.READ
+        access = PermissionCheckAccessType.READ
         self.assertTrue(self.checker.is_authorized(user, access))
         self.assertEqual(
             [
@@ -179,7 +161,7 @@ class PermissionsCheckerIsAuthorizedTest(TestCase):
 
     def test_not_allowed(self):
         user = AuthUser("user-full", ("group1", "group2"))
-        access = PermissionAccessType.SUPERUSER
+        access = PermissionCheckAccessType.SUPERUSER
         self.assertFalse(self.checker.is_authorized(user, access))
         self.assertEqual(
             [
@@ -210,7 +192,7 @@ class PermissionsCheckerIsAuthorizedTest(TestCase):
 
     def test_unrestricted(self):
         user = AuthUser("user-full", ("group1", "group2"))
-        access = PermissionAccessType.UNRESTRICTED
+        access = PermissionCheckAccessType.NONE
         self.assertTrue(self.checker.is_authorized(user, access))
         self.assertEqual(
             [
@@ -224,65 +206,3 @@ class PermissionsCheckerIsAuthorizedTest(TestCase):
             ],
             self.logger.debug.mock_calls,
         )
-
-    def test_use_provided_facade(self):
-        facade = FacadeV2(
-            _config_fixture(
-                (
-                    PermissionEntry(
-                        name="user",
-                        type=PermissionTargetType.USER,
-                        allow=(PermissionAccessType.READ,),
-                    ),
-                )
-            )
-        )
-        user = AuthUser("user", ("group1", "group2"))
-        access = PermissionAccessType.READ
-        self.assertTrue(self.checker.is_authorized(user, access, facade))
-        self.assertEqual(
-            [
-                mock.call(
-                    "Permission check: username=%s groups=%s access=%s",
-                    user.username,
-                    ",".join(user.groups),
-                    str(access.value),
-                ),
-                mock.call(
-                    "Current user permissions: %s",
-                    str(PermissionAccessType.READ.value),
-                ),
-                mock.call("%s access granted", str(access.value).capitalize()),
-            ],
-            self.logger.debug.mock_calls,
-        )
-
-
-class GetLocalClusterPermissionEntriesWithAllowFull(TestCase):
-    def test_success(self):
-        result = get_local_cluster_permission_entries_with_allow_full(
-            _FACADE_FIXTURE
-        )
-
-        self.assertEqual(
-            result,
-            [
-                PermissionEntry(
-                    "user-full",
-                    PermissionTargetType.USER,
-                    (PermissionAccessType.FULL,),
-                )
-            ],
-        )
-
-    def test_superuser(self):
-        superuser_entry = PermissionEntry(
-            "super",
-            PermissionTargetType.USER,
-            (PermissionAccessType.SUPERUSER,),
-        )
-        result = get_local_cluster_permission_entries_with_allow_full(
-            FacadeV2(_config_fixture([superuser_entry]))
-        )
-
-        self.assertEqual(result, [superuser_entry])

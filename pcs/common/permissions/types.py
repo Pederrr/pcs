@@ -7,9 +7,7 @@ class PermissionTargetType(str, Enum):
 
 
 class PermissionAccessType(str, Enum):
-    UNRESTRICTED = "unrestricted"
     READ = "read"
     WRITE = "write"
     GRANT = "grant"
     FULL = "full"
-    SUPERUSER = "superuser"

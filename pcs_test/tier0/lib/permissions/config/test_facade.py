@@ -18,7 +18,7 @@ _USER1 = PermissionEntry(
 _USER2 = PermissionEntry(
     name="user2",
     type=PermissionTargetType.USER,
-    allow=[PermissionAccessType.SUPERUSER],
+    allow=[PermissionAccessType.FULL],
 )
 _GROUP1 = PermissionEntry(
     name="group1",
@@ -34,6 +34,11 @@ _GROUP2 = PermissionEntry(
     type=PermissionTargetType.GROUP,
     allow=[PermissionAccessType.WRITE],
 )
+_GROUP3 = PermissionEntry(
+    name="group3",
+    type=PermissionTargetType.GROUP,
+    allow=[PermissionAccessType.FULL],
+)
 
 _CLUSTER1 = ClusterEntry(name="cluster1", nodes=["A", "B"])
 _CLUSTER2 = ClusterEntry(name="cluster2", nodes=["C", "D"])
@@ -42,7 +47,7 @@ _CONFIG = ConfigV2(
     data_version=1,
     clusters=[_CLUSTER1, _CLUSTER2],
     permissions=ClusterPermissions(
-        local_cluster=[_USER1, _USER2, _GROUP1, _GROUP2]
+        local_cluster=[_USER1, _USER2, _GROUP1, _GROUP2, _GROUP3]
     ),
 )
 
@@ -111,3 +116,10 @@ class FacadeV2AddCluster(TestCase):
         self.assertEqual(
             facade.config.clusters, [_CLUSTER1, _CLUSTER2, new_entry]
         )
+
+
+class FacadeV2GetEntriesWithAllowFull(TestCase):
+    def test_success(self):
+        facade = FacadeV2(_CONFIG)
+        result = facade.get_entries_with_allow_full()
+        self.assertEqual(result, [_USER2, _GROUP3])
