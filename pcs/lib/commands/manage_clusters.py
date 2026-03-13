@@ -17,7 +17,7 @@ from pcs.lib.pcs_cfgsync.sync_files import (
     update_pcs_settings_locally,
 )
 from pcs.lib.permissions.config.types import ClusterEntry
-from pcs.lib.permissions.file_tools import read_pcs_settings_conf
+from pcs.lib.permissions.tools import read_pcs_settings_conf
 
 
 def add_existing_cluster(  # noqa: PLR0912, PLR0915

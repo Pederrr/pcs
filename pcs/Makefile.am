@@ -437,7 +437,6 @@ EXTRA_DIST		= \
 			  lib/permissions/config/parser.py \
 			  lib/permissions/config/types.py \
 			  lib/permissions/const.py \
-			  lib/permissions/file_tools.py \
 			  lib/permissions/__init__.py \
 			  lib/permissions/operations.py \
 			  lib/permissions/tools.py \

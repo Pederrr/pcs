@@ -93,11 +93,11 @@ from pcs.lib.pcs_cfgsync.sync_files import (
     update_pcs_settings_locally,
 )
 from pcs.lib.permissions.checker import PermissionsChecker
-from pcs.lib.permissions.file_tools import read_pcs_settings_conf
 from pcs.lib.permissions.operations import (
     NotAuthorizedToChangeFullUsersException,
     prepare_set_permissions,
 )
+from pcs.lib.permissions.tools import read_pcs_settings_conf
 from pcs.lib.permissions.validations import validate_set_permissions
 from pcs.lib.resource_agent.types import ResourceAgentName
 from pcs.lib.tools import (

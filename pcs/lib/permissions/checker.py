@@ -6,8 +6,7 @@ from pcs.common.permissions.types import (
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
 
-from .file_tools import read_pcs_settings_conf
-from .tools import complete_access_list
+from .tools import complete_access_list, read_pcs_settings_conf
 from .types import PermissionCheckAccessType
 
 

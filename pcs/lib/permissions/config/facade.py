@@ -3,7 +3,6 @@ from typing import Optional, Sequence, cast
 
 from pcs.common.permissions.types import PermissionAccessType
 from pcs.lib.interface.config import SyncVersionFacadeInterface
-from pcs.lib.permissions.tools import complete_access_list
 
 from .types import (
     ClusterEntry,
@@ -71,7 +70,7 @@ class FacadeV2(SyncVersionFacadeInterface):
         return [
             entry
             for entry in self.config.permissions.local_cluster
-            if PermissionAccessType.FULL in complete_access_list(entry.allow)
+            if PermissionAccessType.FULL in entry.allow
         ]
 
     def _ensure_not_present(self, entry: PermissionEntry) -> None:

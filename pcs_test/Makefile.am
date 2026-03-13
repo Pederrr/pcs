@@ -420,7 +420,6 @@ EXTRA_DIST		= \
 			  tier0/lib/permissions/config/test_parser.py \
 			  tier0/lib/permissions/__init__.py \
 			  tier0/lib/permissions/test_checker.py \
-			  tier0/lib/permissions/test_file_tools.py \
 			  tier0/lib/permissions/test_operations.py \
 			  tier0/lib/permissions/test_tools.py \
 			  tier0/lib/permissions/test_validations.py \
