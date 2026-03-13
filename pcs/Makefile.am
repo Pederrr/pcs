@@ -428,6 +428,7 @@ EXTRA_DIST		= \
 			  lib/pcs_cfgsync/fetcher.py \
 			  lib/pcs_cfgsync/__init__.py \
 			  lib/pcs_cfgsync/save_sync.py \
+			  lib/pcs_cfgsync/sync_files.py \
 			  lib/pcs_cfgsync/validations.py \
 			  lib/permissions/checker.py \
 			  lib/permissions/config/exporter.py \
@@ -436,9 +437,12 @@ EXTRA_DIST		= \
 			  lib/permissions/config/parser.py \
 			  lib/permissions/config/types.py \
 			  lib/permissions/const.py \
+			  lib/permissions/file_tools.py \
 			  lib/permissions/__init__.py \
-			  lib/permissions/__init__.py \
+			  lib/permissions/operations.py \
 			  lib/permissions/tools.py \
+			  lib/permissions/types.py \
+			  lib/permissions/validations.py \
 			  lib/resource_agent/const.py \
 			  lib/resource_agent/error.py \
 			  lib/resource_agent/facade.py \

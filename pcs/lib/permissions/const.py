@@ -1,11 +1,11 @@
-from pcs.lib.auth.const import ADMIN_GROUP
-from pcs.lib.permissions.config.types import (
+from pcs.common.permissions.types import (
     PermissionAccessType,
-    PermissionEntry,
     PermissionTargetType,
 )
+from pcs.lib.auth.const import ADMIN_GROUP
+from pcs.lib.permissions.config.types import PermissionEntry
 
-DEFAULT_PERMISSIONS = (
+DEFAULT_PERMISSIONS = [
     # Since ADMIN_GROUP has access to pacemaker by default anyway, we can safely
     # allow access in pcsd as well
     PermissionEntry(
@@ -16,5 +16,5 @@ DEFAULT_PERMISSIONS = (
             PermissionAccessType.WRITE,
             PermissionAccessType.GRANT,
         ),
-    ),
-)
+    )
+]

@@ -1,4 +1,4 @@
-from typing import Literal, Sequence
+from typing import Literal
 from unittest import TestCase
 
 from pcs import settings
@@ -13,7 +13,6 @@ from pcs.lib.commands import cluster
 from pcs.lib.permissions.config.types import PermissionEntry
 
 from pcs_test.tools import fixture
-from pcs_test.tools.assertions import assert_report_item_list_equal
 from pcs_test.tools.command_env import get_env_tools
 from pcs_test.tools.fixture_pcs_cfgsync import (
     fixture_pcs_settings_file_content,
@@ -21,108 +20,6 @@ from pcs_test.tools.fixture_pcs_cfgsync import (
     fixture_save_sync_new_version_error,
     fixture_save_sync_new_version_success,
 )
-
-
-class ValidateSetPermissions(TestCase):
-    def call_validation(
-        self, permissions: Sequence[PermissionEntryDto]
-    ) -> reports.ReportItemList:
-        return cluster._validate_set_permissions(permissions)
-
-    def test_success(self):
-        report_list = self.call_validation(
-            [
-                PermissionEntryDto(
-                    "hacluster",
-                    type=PermissionTargetType.USER,
-                    allow=[
-                        PermissionAccessType.FULL,
-                        PermissionAccessType.SUPERUSER,
-                    ],
-                ),
-                PermissionEntryDto(
-                    "haclient",
-                    type=PermissionTargetType.GROUP,
-                    allow=[
-                        PermissionAccessType.GRANT,
-                        PermissionAccessType.READ,
-                        PermissionAccessType.WRITE,
-                    ],
-                ),
-            ]
-        )
-
-        assert_report_item_list_equal(report_list, [])
-
-    def test_empty_name(self):
-        report_list = self.call_validation(
-            [
-                PermissionEntryDto(
-                    "hacluster",
-                    type=PermissionTargetType.USER,
-                    allow=[
-                        PermissionAccessType.FULL,
-                        PermissionAccessType.SUPERUSER,
-                    ],
-                ),
-                PermissionEntryDto(
-                    "",
-                    type=PermissionTargetType.GROUP,
-                    allow=[PermissionAccessType.READ],
-                ),
-            ]
-        )
-
-        assert_report_item_list_equal(
-            report_list,
-            [
-                fixture.error(
-                    reports.codes.INVALID_OPTION_VALUE,
-                    option_name="name",
-                    option_value="",
-                    allowed_values=None,
-                    cannot_be_empty=True,
-                    forbidden_characters=None,
-                )
-            ],
-        )
-
-    def test_duplicates(self):
-        report_list = self.call_validation(
-            [
-                PermissionEntryDto(
-                    "john",
-                    type=PermissionTargetType.USER,
-                    allow=[PermissionAccessType.SUPERUSER],
-                ),
-                PermissionEntryDto(
-                    "john",
-                    type=PermissionTargetType.USER,
-                    allow=[PermissionAccessType.WRITE],
-                ),
-                # same name, but different 'type' are not duplicates
-                PermissionEntryDto(
-                    "martin",
-                    type=PermissionTargetType.USER,
-                    allow=[PermissionAccessType.READ],
-                ),
-                PermissionEntryDto(
-                    "martin",
-                    type=PermissionTargetType.GROUP,
-                    allow=[PermissionAccessType.READ],
-                ),
-            ]
-        )
-
-        assert_report_item_list_equal(
-            report_list,
-            [
-                fixture.error(
-                    reports.codes.PERMISSION_DUPLICATION,
-                    target_list=[("john", PermissionTargetType.USER)],
-                )
-            ],
-        )
 
 
 class SetPermissionsNotInCluster(TestCase):
@@ -204,11 +101,6 @@ class SetPermissionsNotInCluster(TestCase):
                             PermissionAccessType.WRITE,
                         ],
                     ),
-                    PermissionEntry(
-                        "james",
-                        PermissionTargetType.USER,
-                        allow=sorted(set(PermissionAccessType)),
-                    ),
                 ],
             ).encode(),
             can_overwrite=True,
@@ -232,11 +124,6 @@ class SetPermissionsNotInCluster(TestCase):
                     PermissionTargetType.GROUP,
                     [PermissionAccessType.FULL],
                 ),
-                PermissionEntryDto(
-                    "james",
-                    PermissionTargetType.USER,
-                    [PermissionAccessType.SUPERUSER],
-                ),
             ],
         )
 
@@ -245,19 +132,31 @@ class SetPermissionsNotInCluster(TestCase):
             file_type_codes.PCS_SETTINGS_CONF,
             settings.pcsd_settings_conf_location,
         )
+        local_pcs_settings = fixture_pcs_settings_file_content(
+            1,
+            permissions=[
+                PermissionEntry(
+                    "group",
+                    PermissionTargetType.GROUP,
+                    allow=[PermissionAccessType.FULL],
+                )
+            ],
+        )
         self.config.raw_file.read(
             file_type_codes.PCS_SETTINGS_CONF,
             settings.pcsd_settings_conf_location,
-            content=fixture_pcs_settings_file_content(
-                1,
-                permissions=[
-                    PermissionEntry(
-                        "group",
-                        PermissionTargetType.GROUP,
-                        allow=[PermissionAccessType.FULL],
-                    )
-                ],
-            ),
+            content=local_pcs_settings,
+        )
+        self.config.raw_file.exists(
+            file_type_codes.PCS_SETTINGS_CONF,
+            settings.pcsd_settings_conf_location,
+            name="raw_file.exists.pcs_settings.permission_check",
+        )
+        self.config.raw_file.read(
+            file_type_codes.PCS_SETTINGS_CONF,
+            settings.pcsd_settings_conf_location,
+            content=local_pcs_settings,
+            name="raw_file.read.pcs_settings.permission_check",
         )
         self.config.raw_file.exists(
             file_type_codes.COROSYNC_CONF,
@@ -302,19 +201,31 @@ class SetPermissionsNotInCluster(TestCase):
             file_type_codes.PCS_SETTINGS_CONF,
             settings.pcsd_settings_conf_location,
         )
+        local_pcs_settings = fixture_pcs_settings_file_content(
+            1,
+            permissions=[
+                PermissionEntry(
+                    "john",
+                    PermissionTargetType.USER,
+                    allow=[PermissionAccessType.WRITE],
+                )
+            ],
+        )
         self.config.raw_file.read(
             file_type_codes.PCS_SETTINGS_CONF,
             settings.pcsd_settings_conf_location,
-            content=fixture_pcs_settings_file_content(
-                1,
-                permissions=[
-                    PermissionEntry(
-                        "john",
-                        PermissionTargetType.USER,
-                        allow=[PermissionAccessType.WRITE],
-                    )
-                ],
-            ),
+            content=local_pcs_settings,
+        )
+        self.config.raw_file.exists(
+            file_type_codes.PCS_SETTINGS_CONF,
+            settings.pcsd_settings_conf_location,
+            name="raw_file.exists.pcs_settings.permission_check",
+        )
+        self.config.raw_file.read(
+            file_type_codes.PCS_SETTINGS_CONF,
+            settings.pcsd_settings_conf_location,
+            content=local_pcs_settings,
+            name="raw_file.read.pcs_settings.permission_check",
         )
 
         self.env_assist.assert_raise_library_error(

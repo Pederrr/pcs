@@ -26,7 +26,7 @@ from pcs.lib.commands import (  # services,
     stonith_agent,
     tag,
 )
-from pcs.lib.permissions.config.types import PermissionAccessType as p
+from pcs.lib.permissions.types import PermissionCheckAccessType as p
 
 
 @dataclass(frozen=True)
@@ -114,7 +114,7 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
     ),
     "auth.auth_hosts": _Cmd(
         cmd=auth.auth_hosts,
-        required_permission=p.UNRESTRICTED,
+        required_permission=p.NONE,
     ),
     "booth.ticket_cleanup": _Cmd(
         cmd=booth.ticket_cleanup,
@@ -260,7 +260,7 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
         cmd=manage_clusters.add_existing_cluster,
         # needs to be UNRESTRICTED for backwards compatibility with
         # the original handler in ruby
-        required_permission=p.UNRESTRICTED,
+        required_permission=p.NONE,
     ),
     "node.maintenance_unmaintenance_all": _Cmd(
         cmd=node.maintenance_unmaintenance_all,
