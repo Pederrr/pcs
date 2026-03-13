@@ -1,5 +1,4 @@
 import logging
-from typing import Collection
 
 from pcs.common.permissions.types import (
     PermissionTargetType,
@@ -8,25 +7,8 @@ from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.types import AuthUser
 
 from .file_tools import read_pcs_settings_conf
+from .tools import complete_access_list
 from .types import PermissionCheckAccessType
-
-
-def _complete_access_list(
-    access_list: Collection[PermissionCheckAccessType],
-) -> set[PermissionCheckAccessType]:
-    if PermissionCheckAccessType.SUPERUSER in access_list:
-        return set(PermissionCheckAccessType) - {PermissionCheckAccessType.NONE}
-    if PermissionCheckAccessType.FULL in access_list:
-        return {
-            PermissionCheckAccessType.READ,
-            PermissionCheckAccessType.WRITE,
-            PermissionCheckAccessType.GRANT,
-            PermissionCheckAccessType.FULL,
-        }
-    new = set(access_list)
-    if PermissionCheckAccessType.WRITE in access_list:
-        return new | {PermissionCheckAccessType.READ}
-    return new
 
 
 class PermissionsChecker:
@@ -34,11 +16,12 @@ class PermissionsChecker:
         self._logger = logger
 
     def _get_permissions(
-        self,
-        auth_user: AuthUser,
+        self, auth_user: AuthUser
     ) -> set[PermissionCheckAccessType]:
         if auth_user.username == SUPERUSER:
-            return _complete_access_list((PermissionCheckAccessType.SUPERUSER,))
+            return set(PermissionCheckAccessType) - {
+                PermissionCheckAccessType.NONE
+            }
 
         facade = read_pcs_settings_conf(self._logger)[0]
         all_permissions = set()
@@ -47,11 +30,11 @@ class PermissionsChecker:
         ] + [(group, PermissionTargetType.GROUP) for group in auth_user.groups]:
             entry = facade.get_entry(target_name, target_type)
             if entry:
-                all_permissions |= {
-                    PermissionCheckAccessType.from_permission_access_type(allow)
-                    for allow in entry.allow
-                }
-        return _complete_access_list(all_permissions)
+                all_permissions |= set(entry.allow)
+        return {
+            PermissionCheckAccessType.from_permission_access_type(allow)
+            for allow in complete_access_list(all_permissions)
+        }
 
     def is_authorized(
         self, auth_user: AuthUser, access: PermissionCheckAccessType
