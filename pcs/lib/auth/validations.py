@@ -5,6 +5,7 @@ from pcs import settings
 from pcs.common import reports
 from pcs.common.auth import HostAuthData, HostWithTokenAuthData
 from pcs.common.host import Destination
+from pcs.common.types import StringSequence
 from pcs.lib import validate
 
 # TODO This is a temporary solution for validation of input "dto" data.
@@ -103,5 +104,26 @@ def validate_hosts(
         report_list.extend(
             _validate_destinations(host_name, host_data.dest_list)
         )
+
+    return report_list
+
+
+def validate_known_hosts_change(
+    hosts_to_add: Mapping[str, HostWithTokenAuthData],
+    hosts_to_remove: StringSequence,
+) -> reports.ReportItemList:
+    # TODO validation:
+    #   - [x] new hosts validation
+    #   - [ ] maybe validate no duplicates in hosts to remove ?
+    #   - [ ] that add/remove do not contain the same hosts
+
+    report_list = validate_hosts_with_token(hosts_to_add)
+
+    add_and_remove = set(hosts_to_add) & set(hosts_to_remove)
+    if add_and_remove:
+        # Report that you are not allowed to add and remove the same token
+        # at the same time
+        # report_list.append()
+        pass
 
     return report_list

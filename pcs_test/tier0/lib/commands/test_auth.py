@@ -1247,3 +1247,12 @@ class DeauthAllLocalHosts(TestCase):
         )
 
         auth.deauth_all_local_hosts(self.env_assist.get_env())
+
+
+# TODO refactor the tests little bit
+class KnownHostsChange(TestCase):
+    def setUp(self):
+        self.env_assist, self.config = get_env_tools(self)
+
+    def test_validation_failures(self):
+        pass
