@@ -1,4 +1,3 @@
-from typing import Literal
 from unittest import TestCase
 
 from pcs import settings
@@ -15,6 +14,7 @@ from pcs.lib.permissions.config.types import PermissionEntry
 from pcs_test.tools import fixture
 from pcs_test.tools.command_env import get_env_tools
 from pcs_test.tools.fixture_pcs_cfgsync import (
+    fixture_expected_save_sync_reports,
     fixture_pcs_settings_file_content,
     fixture_save_sync_new_version_conflict,
     fixture_save_sync_new_version_error,
@@ -420,66 +420,6 @@ class SetPermissionsInCluster(TestCase):
         self.env_assist, self.config = get_env_tools(self)
         self.config.env.set_known_nodes(self.NODE_LABELS)
 
-    def fixture_expected_cfgsync_reports(
-        self, expected_result: Literal["ok", "conflict", "error"]
-    ) -> reports.ReportItemList:
-        _report_code_map = {
-            "ok": reports.codes.PCS_CFGSYNC_CONFIG_ACCEPTED,
-            "conflict": reports.codes.PCS_CFGSYNC_CONFIG_REJECTED,
-            "error": reports.codes.PCS_CFGSYNC_CONFIG_SAVE_ERROR,
-        }
-
-        first_node_report = (
-            fixture.error(
-                _report_code_map[expected_result],
-                file_type_code=file_type_codes.PCS_SETTINGS_CONF,
-                context=reports.dto.ReportItemContextDto(self.NODE_LABELS[0]),
-            )
-            if expected_result in ("error", "conflict")
-            else fixture.info(
-                _report_code_map[expected_result],
-                file_type_code=file_type_codes.PCS_SETTINGS_CONF,
-                context=reports.dto.ReportItemContextDto(self.NODE_LABELS[0]),
-            )
-        )
-
-        report_list = [
-            fixture.info(
-                reports.codes.PCS_CFGSYNC_SENDING_CONFIGS_TO_NODES,
-                file_type_code_list=[file_type_codes.PCS_SETTINGS_CONF],
-                node_name_list=self.NODE_LABELS,
-            ),
-            first_node_report,
-        ] + [
-            fixture.info(
-                reports.codes.PCS_CFGSYNC_CONFIG_ACCEPTED,
-                file_type_code=file_type_codes.PCS_SETTINGS_CONF,
-                context=reports.dto.ReportItemContextDto(node_label),
-            )
-            for node_label in self.NODE_LABELS[1:]
-        ]
-
-        if expected_result == "conflict":
-            return report_list + [
-                fixture.info(
-                    reports.codes.PCS_CFGSYNC_FETCHING_NEWEST_CONFIG,
-                    file_type_code_list=[file_type_codes.PCS_SETTINGS_CONF],
-                    node_name_list=self.NODE_LABELS,
-                ),
-                fixture.error(reports.codes.PCS_CFGSYNC_CONFLICT_REPEAT_ACTION),
-            ]
-
-        if expected_result == "error":
-            return report_list + [
-                fixture.error(
-                    reports.codes.PCS_CFGSYNC_SENDING_CONFIGS_TO_NODES_FAILED,
-                    file_type_code_list=[file_type_codes.PCS_SETTINGS_CONF],
-                    node_name_list=[self.NODE_LABELS[0]],
-                )
-            ]
-
-        return report_list
-
     def test_success(self):
         self.config.raw_file.exists(
             file_type_codes.PCS_SETTINGS_CONF,
@@ -525,7 +465,10 @@ class SetPermissionsInCluster(TestCase):
         )
 
         self.env_assist.assert_reports(
-            self.fixture_expected_cfgsync_reports("ok")
+            fixture_expected_save_sync_reports(
+                file_type=file_type_codes.PCS_SETTINGS_CONF,
+                node_labels=self.NODE_LABELS,
+            )
         )
 
     def test_sync_conflict(self):
@@ -592,7 +535,11 @@ class SetPermissionsInCluster(TestCase):
         )
 
         self.env_assist.assert_reports(
-            self.fixture_expected_cfgsync_reports("conflict")
+            fixture_expected_save_sync_reports(
+                file_type=file_type_codes.PCS_SETTINGS_CONF,
+                node_labels=self.NODE_LABELS,
+                expected_result="conflict",
+            )
         )
 
     def test_sync_conflict_error_writing_newest_file(self):
@@ -660,7 +607,11 @@ class SetPermissionsInCluster(TestCase):
         )
 
         self.env_assist.assert_reports(
-            self.fixture_expected_cfgsync_reports("conflict")
+            fixture_expected_save_sync_reports(
+                file_type=file_type_codes.PCS_SETTINGS_CONF,
+                node_labels=self.NODE_LABELS,
+                expected_result="conflict",
+            )
             + [
                 fixture.error(
                     reports.codes.FILE_IO_ERROR,
@@ -718,5 +669,9 @@ class SetPermissionsInCluster(TestCase):
         )
 
         self.env_assist.assert_reports(
-            self.fixture_expected_cfgsync_reports("error")
+            fixture_expected_save_sync_reports(
+                file_type=file_type_codes.PCS_SETTINGS_CONF,
+                node_labels=self.NODE_LABELS,
+                expected_result="error",
+            )
         )
