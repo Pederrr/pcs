@@ -2,7 +2,7 @@ import importlib
 import pkgutil
 from collections.abc import Sequence
 from dataclasses import dataclass, field, is_dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from unittest import TestCase
 
 from dacite.exceptions import WrongTypeError
@@ -245,3 +245,34 @@ class UnexpectedTypes(TestCase):
         self.assertEqual(
             dict(field_a="a", field_b={1: "1", 2: "2"}), to_dict(dto)
         )
+
+
+# Union[None, bool, int, str] mirrors WaitType from pcs.lib.env
+@dataclass
+class PrimitiveUnionDto(DataTransferObject):
+    field_a: Union[None, bool, int, str]
+    field_b: str
+
+
+class PrimitiveUnionTest(TestCase):
+    def test_success_to_dict(self):
+        for value in (None, True, 42, "text"):
+            with self.subTest(value=value):
+                dto = PrimitiveUnionDto(value, "x")
+                self.assertEqual(dict(field_a=value, field_b="x"), to_dict(dto))
+
+    def test_success_from_dict(self):
+        for value in (None, True, 42, "text"):
+            with self.subTest(value=value):
+                result = from_dict(
+                    PrimitiveUnionDto, dict(field_a=value, field_b="x")
+                )
+                self.assertEqual(PrimitiveUnionDto(value, "x"), result)
+
+    def test_error_non_primitive(self):
+        @dataclass
+        class BadDto(DataTransferObject):
+            field_a: Union[str, list[str]]
+
+        with self.assertRaises(AssertionError):
+            to_dict(BadDto("x"))

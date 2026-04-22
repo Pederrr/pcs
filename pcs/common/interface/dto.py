@@ -116,6 +116,9 @@ def meta(name: str) -> dict[str, str]:
     return metadata
 
 
+_PRIMITIVE_TYPES = frozenset({str, int, float, bool, NoneType})
+
+
 # _type is Any - in reality, it is either one of:
 # * type
 # * enum.EnumType
@@ -123,14 +126,19 @@ def meta(name: str) -> dict[str, str]:
 # Especially the typing module changes with new Python versions.
 # Properly typing (rather metatyping, since its input and output are types)
 # this function doesn't bring any benefits.
-def _extract_type_from_optional(_type: Any) -> Any:
+def _resolve_type_from_union(_type: Any) -> Any:
     # Dataclass fields may be typed as 'Optional[some_type]' or
     # 'Union[some_type, None]' or 'some_type | None'. This function extracts
     # the inner type from an Optional, and thus allows to properly detect types
-    # of such dataclass fields. It raises an exception if a Union contains more
-    # than one type other than None, because in that case it is unclear which
-    # one is the correct type. However, such a field should never be defined in
-    # a dataclass, because field type must be unambiguous.
+    # of such dataclass fields.
+    #
+    # For unions of only primitive types (e.g. Union[str, int, None]),
+    # no conversion is needed regardless of the actual runtime value, so the
+    # union type itself is returned and the caller passes the value through.
+    #
+    # It raises an exception if a Union contains more than one non-primitive
+    # type, because in that case the correct transformation cannot be
+    # determined. Such a field should never be defined in a dataclass.
 
     # Internal representation of Union and Optional is different in Python 3.12
     # and 3.14. To be able to handle the differences, typing.get_origin is
@@ -147,6 +155,8 @@ def _extract_type_from_optional(_type: Any) -> Any:
     ]
     if len(inner_types_without_none) == 1:
         return inner_types_without_none[0]
+    if all(t in _PRIMITIVE_TYPES for t in inner_types_without_none):
+        return _type
     raise _UnionNotAllowed()
 
 
@@ -195,13 +205,14 @@ def _convert_dict(
     type_hints = get_type_hints(klass)
     for _field in fields(klass):
         try:
-            _type = _extract_type_from_optional(type_hints[_field.name])
+            _type = _resolve_type_from_union(type_hints[_field.name])
         except _UnionNotAllowed as e:
             raise AssertionError(
                 f"Field '{_field.name}' in class '{klass}' is a Union: "
                 f"{_field.type}. "
-                "Dataclass fields cannot be Unions, unless they are a Union of "
-                "one type and None (which is equal to Optional)."
+                "Dataclass fields cannot be Unions unless they are Optional "
+                "(a Union of one type and None) or a union of only primitive "
+                "types."
             ) from e
         value = obj_dict[_field.name]
 
@@ -251,13 +262,14 @@ def _convert_payload(klass: type[DTOTYPE], data: DtoPayload) -> DtoPayload:
             continue
 
         try:
-            _type = _extract_type_from_optional(type_hints[_field.name])
+            _type = _resolve_type_from_union(type_hints[_field.name])
         except _UnionNotAllowed as e:
             raise AssertionError(
                 f"Field '{_field.name}' in class '{klass}' is a Union: "
                 f"{_field.type}. "
-                "Dataclass fields cannot be Unions, unless they are a Union of "
-                "one type and None (which is equal to Optional)."
+                "Dataclass fields cannot be Unions unless they are Optional "
+                "(a Union of one type and None) or a union of only primitive "
+                "types."
             ) from e
         value = data[new_name]
 
