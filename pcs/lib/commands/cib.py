@@ -3,7 +3,6 @@ from typing import Iterable
 from lxml.etree import _Element
 
 from pcs.common import reports
-from pcs.common.types import StringCollection
 from pcs.lib.cib import element_description as cib_element_description
 from pcs.lib.cib.remove_elements import (
     ElementsToRemove,
@@ -23,7 +22,7 @@ from pcs.lib.sbd_stonith import ensure_some_stonith_remains
 
 def remove_elements(
     env: LibraryEnvironment,
-    ids: StringCollection,
+    ids: list[str],
     force_flags: reports.types.ForceFlags = (),
 ) -> None:
     """

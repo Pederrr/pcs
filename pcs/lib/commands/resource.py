@@ -1391,7 +1391,7 @@ def _disable_run_simulate(
 
 def disable(
     env: LibraryEnvironment,
-    resource_or_tag_ids: StringCollection,
+    resource_or_tag_ids: list[str],
     wait: WaitType = False,
     force_flags: reports.types.ForceFlags = (),
 ):
@@ -3098,7 +3098,7 @@ def update_meta(
 
 def stop(
     env: LibraryEnvironment,
-    resource_or_tag_ids: StringCollection,
+    resource_or_tag_ids: list[str],
     force_flags: reports.types.ForceFlags = (),
 ) -> None:
     """

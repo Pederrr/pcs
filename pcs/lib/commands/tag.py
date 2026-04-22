@@ -8,7 +8,6 @@ from typing import (
 from lxml.etree import _Element
 
 from pcs.common.pacemaker.tag import CibTagListDto
-from pcs.common.types import StringSequence
 from pcs.lib.cib import tag
 from pcs.lib.cib.tools import (
     IdProvider,
@@ -27,9 +26,7 @@ def cib_tags_section(env: LibraryEnvironment) -> Iterator[_Element]:
     env.push_cib()
 
 
-def create(
-    env: LibraryEnvironment, tag_id: str, idref_list: StringSequence
-) -> None:
+def create(env: LibraryEnvironment, tag_id: str, idref_list: list[str]) -> None:
     """
     Create a tag in a cib.
 
@@ -52,7 +49,7 @@ def create(
 
 
 def _get_tag_elements(
-    env: LibraryEnvironment, tag_filter: StringSequence
+    env: LibraryEnvironment, tag_filter: list[str]
 ) -> list[_Element]:
     tags_section: _Element = get_tags(env.get_cib())
 
@@ -69,8 +66,8 @@ def _get_tag_elements(
 
 
 def config(
-    env: LibraryEnvironment, tag_filter: StringSequence
-) -> list[dict[str, Union[str, list[str]]]]:
+    env: LibraryEnvironment, tag_filter: list[str]
+) -> list[dict[str, Union[str, list[str]]]]:  # TODO?
     """
     Get tags specified in tag_filter or if empty, then get all the tags
     configured.
@@ -86,7 +83,7 @@ def config(
 
 
 def get_config_dto(
-    env: LibraryEnvironment, tag_filter: StringSequence
+    env: LibraryEnvironment, tag_filter: list[str]
 ) -> CibTagListDto:
     """
     Get tags specified in tag_filter or if empty, then get all the tags
@@ -105,7 +102,7 @@ def get_config_dto(
     )
 
 
-def remove(env: LibraryEnvironment, tag_list: StringSequence) -> None:
+def remove(env: LibraryEnvironment, tag_list: list[str]) -> None:
     """
     Remove specified tags from a cib.
 
@@ -131,8 +128,8 @@ def remove(env: LibraryEnvironment, tag_list: StringSequence) -> None:
 def update(
     env: LibraryEnvironment,
     tag_id: str,
-    idref_add: StringSequence,
-    idref_remove: StringSequence,
+    idref_add: list[str],
+    idref_remove: list[str],
     adjacent_idref: Optional[str] = None,
     put_after_adjacent: bool = False,
 ) -> None:

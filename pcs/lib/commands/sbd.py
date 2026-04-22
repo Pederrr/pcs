@@ -5,10 +5,7 @@ from pcs.common import reports
 from pcs.common.node_communicator import RequestTarget
 from pcs.common.types import StringSequence
 from pcs.common.validate import is_integer
-from pcs.lib import (
-    sbd,
-    validate,
-)
+from pcs.lib import sbd, validate
 from pcs.lib.cib.tools import get_resources
 from pcs.lib.communication.nodes import GetOnlineTargets
 from pcs.lib.communication.sbd import (
@@ -158,8 +155,8 @@ def enable_sbd(  # noqa: PLR0913
     default_watchdog: Optional[str],
     watchdog_dict: Mapping[str, str],
     sbd_options: Mapping[str, str],
-    default_device_list: Optional[StringSequence] = None,
-    node_device_dict: Optional[Mapping[str, StringSequence]] = None,
+    default_device_list: Optional[list[str]] = None,
+    node_device_dict: Optional[Mapping[str, list[str]]] = None,
     *,
     allow_unknown_opts: bool = False,
     ignore_offline_nodes: bool = False,

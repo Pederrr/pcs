@@ -1,14 +1,7 @@
-from typing import (
-    Any,
-    Optional,
-)
+from typing import Any, Optional
 
-from pcs.common.fencing_topology import (
-    FencingTargetType,
-    FencingTargetValue,
-)
+from pcs.common.fencing_topology import FencingTargetType, FencingTargetValue
 from pcs.common.pacemaker.fencing_topology import CibFencingTopologyDto
-from pcs.common.types import StringSequence
 from pcs.lib.cib import fencing_topology as cib_fencing_topology
 from pcs.lib.cib.tools import get_fencing_topology
 from pcs.lib.env import LibraryEnvironment
@@ -20,8 +13,8 @@ def add_level(
     lib_env: LibraryEnvironment,
     level: str,
     target_type: FencingTargetType,
-    target_value: FencingTargetValue,
-    devices: StringSequence,
+    target_value: FencingTargetValue,  # TODO
+    devices: list[str],
     level_id: Optional[str] = None,
     force_device: bool = False,
     force_node: bool = False,
@@ -98,7 +91,7 @@ def remove_levels_by_params(
     level: Optional[str] = None,
     target_type: Optional[FencingTargetType] = None,
     target_value: Optional[FencingTargetValue] = None,
-    devices: Optional[StringSequence] = None,
+    devices: Optional[list[str]] = None,
 ) -> None:
     """
     Remove specified fencing level(s).

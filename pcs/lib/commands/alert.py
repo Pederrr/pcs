@@ -1,17 +1,13 @@
 from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 from pcs.common.pacemaker.alert import CibAlertListDto
-from pcs.common.types import StringIterable
 from pcs.lib.cib import alert
 from pcs.lib.cib.nvpair import (
     arrange_first_instance_attributes,
     arrange_first_meta_attributes,
 )
 from pcs.lib.cib.rule.in_effect import get_rule_evaluator
-from pcs.lib.cib.tools import (
-    IdProvider,
-    get_alerts,
-)
+from pcs.lib.cib.tools import IdProvider, get_alerts
 from pcs.lib.env import LibraryEnvironment
 from pcs.lib.errors import LibraryError
 
@@ -101,9 +97,7 @@ def update_alert(
     lib_env.push_cib()
 
 
-def remove_alert(
-    lib_env: LibraryEnvironment, alert_id_list: StringIterable
-) -> None:
+def remove_alert(lib_env: LibraryEnvironment, alert_id_list: list[str]) -> None:
     """
     Remove alerts with specified ids.
 
@@ -238,7 +232,7 @@ def update_recipient(
 
 
 def remove_recipient(
-    lib_env: LibraryEnvironment, recipient_id_list: StringIterable
+    lib_env: LibraryEnvironment, recipient_id_list: list[str]
 ) -> None:
     """
     Remove specified recipients.

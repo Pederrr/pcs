@@ -3,7 +3,6 @@ import os.path
 from pcs import settings
 from pcs.common import reports
 from pcs.common.str_tools import join_multilines
-from pcs.common.types import StringCollection
 from pcs.lib.env import LibraryEnvironment
 from pcs.lib.errors import LibraryError
 
@@ -11,8 +10,8 @@ from pcs.lib.errors import LibraryError
 def _unfence_node_devices(
     env: LibraryEnvironment,
     plug: str,
-    original_devices: StringCollection,
-    updated_devices: StringCollection,
+    original_devices: list[str],
+    updated_devices: list[str],
     fence_agent: str,
 ):
     """
@@ -86,8 +85,8 @@ def _unfence_node_devices(
 def unfence_node(
     env: LibraryEnvironment,
     node: str,
-    original_devices: StringCollection,
-    updated_devices: StringCollection,
+    original_devices: list[str],
+    updated_devices: list[str],
 ) -> None:
     """
     Unfence scsi devices on a node by calling fence_scsi agent script. Only
@@ -109,8 +108,8 @@ def unfence_node(
 def unfence_node_mpath(
     env: LibraryEnvironment,
     key: str,
-    original_devices: StringCollection,
-    updated_devices: StringCollection,
+    original_devices: list[str],
+    updated_devices: list[str],
 ) -> None:
     """
     Unfence mpath devices on a node by calling fence_mpath agent script. Only
