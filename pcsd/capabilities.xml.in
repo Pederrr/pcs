@@ -2526,34 +2526,27 @@
         pcs commands: stonith history update
       </description>
     </capability>
-    <capability id="pcmk.stonith.levels" in-pcs="1" in-pcsd="1">
+    <capability id="pcmk.stonith.levels" in-pcs="1" in-pcsd="0">
       <description>
         Basic stonith levels configuration:
         * add a new stonith level with specified level, node and stonith device
         * remove a stonith level with specified level, node and stonith device
 
         pcs commands: stonith level [ add | delete | remove ]
-        daemon urls:
-         /api/v1/fencing-topology-add-level/v1
-         /api/v1/fencing-topology-remove-all-levels/v1
-         /api/v1/fencing-topology-remove-levels-by-params/v1
       </description>
     </capability>
-    <capability id="pcmk.stonith.levels.add-remove-devices-list" in-pcs="1" in-pcsd="1">
+    <capability id="pcmk.stonith.levels.add-remove-devices-list" in-pcs="1" in-pcsd="0">
       <description>
         Add or remove a list of stonith to a fencing level.
 
         pcs commands: stonith level ( add | delete | remove )
-        daemon urls:
-         /api/v1/fencing-topology-add-level/v1
       </description>
     </capability>
-    <capability id="pcmk.stonith.levels.add-with-id" in-pcs="1" in-pcsd="1">
+    <capability id="pcmk.stonith.levels.add-with-id" in-pcs="1" in-pcsd="0">
       <description>
         Add a new stonith level with an ability to set its id.
 
         pcs commands: stonith level add
-        API v2: fencing_topology.add_level
       </description>
     </capability>
     <capability id="pcmk.stonith.levels.config.output-formats" in-pcs="1" in-pcsd="1">
@@ -2566,23 +2559,19 @@
           API v2: fencing_topology.get_config_dto
       </description>
     </capability>
-    <capability id="pcmk.stonith.levels.node-attr" in-pcs="1" in-pcsd="1">
+    <capability id="pcmk.stonith.levels.node-attr" in-pcs="1" in-pcsd="0">
       <description>
         Support specifying a target by a node attribute.
 
         pcs commands: attrib%name=value
-        daemon urls:
-         /api/v1/fencing-topology-add-level/v1
       </description>
     </capability>
-    <capability id="pcmk.stonith.levels.node-regexp" in-pcs="1" in-pcsd="1">
+    <capability id="pcmk.stonith.levels.node-regexp" in-pcs="1" in-pcsd="0">
       <description>
         Support specifying a target by a regular expression applied to node
         name.
 
         pcs commands: regexp%pattern
-        daemon urls:
-         /api/v1/fencing-topology-add-level/v1
       </description>
     </capability>
     <capability id="pcmk.stonith.levels.clear" in-pcs="1" in-pcsd="1">
@@ -3075,9 +3064,7 @@
           constraint_ticket.create
           constraint_ticket.create_with_set
           constraint_ticket.remove
-          fencing_topology.add_level
           fencing_topology.remove_all_levels
-          fencing_topology.remove_levels_by_params
           node.standby_unstandby_list
           qdevice.client_net_import_certificate
           qdevice.qdevice_net_sign_certificate_request

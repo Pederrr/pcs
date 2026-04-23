@@ -249,10 +249,11 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
         cmd=constraint.common.get_config,
         required_permission=p.READ,
     ),
-    "fencing_topology.add_level": _Cmd(
-        cmd=fencing_topology.add_level,
-        required_permission=p.WRITE,
-    ),
+    # CMD removed because it uses dissalowed Unions in its input
+    # "fencing_topology.add_level": _Cmd(
+    #    cmd=fencing_topology.add_level,
+    #    required_permission=p.WRITE,
+    # ),
     "fencing_topology.get_config_dto": _Cmd(
         cmd=fencing_topology.get_config_dto,
         required_permission=p.READ,
@@ -261,10 +262,11 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
         cmd=fencing_topology.remove_all_levels,
         required_permission=p.WRITE,
     ),
-    "fencing_topology.remove_levels_by_params": _Cmd(
-        cmd=fencing_topology.remove_levels_by_params,
-        required_permission=p.WRITE,
-    ),
+    # CMD removed because it uses dissalowed Unions in its input
+    # "fencing_topology.remove_levels_by_params": _Cmd(
+    #    cmd=fencing_topology.remove_levels_by_params,
+    #    required_permission=p.WRITE,
+    # ),
     "fencing_topology.verify": _Cmd(
         cmd=fencing_topology.verify,
         required_permission=p.WRITE,
