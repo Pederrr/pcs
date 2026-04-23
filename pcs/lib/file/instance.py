@@ -243,6 +243,10 @@ class FileInstance:
         """
         self._raw_file.write(raw_file_data, can_overwrite=can_overwrite)
 
+    def backup(self) -> None:
+        self._raw_file.backup()
+        self._raw_file.remove_old_backups()
+
 
 def _get_raw_file(
     file_metadata: FileMetadata, is_ghost: bool, ghost_data: Optional[bytes]
