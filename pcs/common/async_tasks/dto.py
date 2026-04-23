@@ -43,4 +43,14 @@ class TaskResultDto(DataTransferObject):
     state: TaskState
     task_finish_type: TaskFinishType
     kill_reason: Optional[TaskKillReason]
+    # TODO
+    # there is a whole parostroj for converting DTOs implemented in
+    # pcs.common.interface.dto.to_dict but it is actually not used for result
+    # DTO data because this is typed as Any. However, the commands with DTOs
+    # as output still work without any issues -> dataclasses.asdict does
+    # everything we are trying to achieve
+    #
+    # e.g. lib command status.resources_status command works without any issues
+    # despite the output value being defined as bunch of Unions (which are
+    # dissalowed in our conversion steam engine)
     result: Any

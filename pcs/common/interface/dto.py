@@ -196,6 +196,25 @@ def _convert_enum(value: Enum) -> Any:
     return value.value
 
 
+# TODO: the orignal point of this loop was to rename
+# the keys according to the META_NAME metadata
+#
+# META_NAME renaming is however used only on one place: ResourceAgentActionDto
+# which is part of return value for resource_agent.get_agent_metadata
+# - this command is used from cli, but to_dict is not used to print the data
+#       - the actions are not even printed
+# - does not seem to be used from WebUI
+# - does not even work from APIv1/2, because APIv2 TaskResultDto has
+#   command result type typed as Any, so this whole function does nothing
+#
+# The current enum conversion does not work correctly for APIv2/1, becuase of
+# the Any in TaskResultDto
+#
+# Do we really need this overly complicated parostroj?
+#
+# Without META_NAME conversion, we would only need to:
+# - use dataclasses.asdict to convert into dict, which already works recursively
+# - go through all values recursively, and replace the enum objects with values
 def _convert_dict(
     klass: type[DataTransferObject], obj_dict: DtoPayload
 ) -> DtoPayload:
@@ -248,6 +267,15 @@ def to_dict(obj: DataTransferObject) -> DtoPayload:
 DTOTYPE = TypeVar("DTOTYPE", bound=DataTransferObject)
 
 
+# TODO:
+# the whole purpose of this is to be able to change the names of fields
+# according to the META_NAME
+#
+# but meta name is used only in one place: ResourceAgentActionDto
+# - which is not used as an input for any command, so this meta translation
+#   is not even used on the `from_dict` side
+#
+# Do we really need this overly complicated parostroj?
 def _convert_payload(klass: type[DTOTYPE], data: DtoPayload) -> DtoPayload:
     try:
         new_dict = dict(data)
