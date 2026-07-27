@@ -107,7 +107,7 @@ implementation patterns, prefer:
 - **DTO-based data exchange** over raw dicts
 - **Recent `pcs/lib/commands/`** implementations over older ones — see the
   reference table in
-  [architecture/library.md](architecture/library.md#library-commands)
+  [architecture/cib.md](architecture/cib.md#reference-implementations)
 
 Legacy code is functional and valuable as a knowledge source (domain logic, edge
 cases), but its structure and patterns should not be replicated in new code.

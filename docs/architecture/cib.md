@@ -14,14 +14,7 @@ def my_command(env: LibraryEnvironment, ...) -> None:
     env.push_cib()
 ```
 
-For reference implementations, prefer recent code — older commands may use
-outdated patterns. Good references:
-
-| Function                  | Location                              | Demonstrates                              |
-|---------------------------|---------------------------------------|-------------------------------------------|
-| `element_description_set` | `pcs/lib/commands/cib.py`             | Simple CIB-modifying command              |
-| `element_description_get` | `pcs/lib/commands/cib.py`             | Simple CIB-reading command                |
-| `rename_node_cib`         | `pcs/lib/commands/cluster/node.py`    | Decomposition with `ReportItemList` helpers |
+For reference implementations, see [below](#reference-implementations).
 
 ## CIB section access
 
@@ -255,14 +248,8 @@ def my_command(env: LibraryEnvironment, ...) -> None:
     env.push_cib()
 ```
 
-For reference implementations of this pattern:
-
-| Function              | Location                                    | Demonstrates                                              |
-|-----------------------|---------------------------------------------|-----------------------------------------------------------|
-| `set_properties`      | `pcs/lib/commands/cluster_property.py`       | Validation / modification split                           |
-| `create_alert`        | `pcs/lib/commands/alert.py`                  | Validation / modification split, `IdProvider`             |
-| `create_plain_with_rule` | `pcs/lib/commands/constraint/location.py` | Validator class with intermediate results, `IdProvider`   |
-| `create_with_set`     | `pcs/lib/commands/constraint/ticket.py`      | Multi-step validation, value normalization, `IdProvider`  |
+For reference implementations of this pattern, see
+[below](#reference-implementations).
 
 ### `IdProvider`
 
@@ -343,3 +330,14 @@ functions contain CIB manipulation that could live in `pcs/lib/cib/`. If it
 works and has a single caller, there is no reason to refactor it. Apply these
 principles when writing new code or when refactoring creates a genuine
 readability or reuse benefit.
+
+## Reference implementations
+
+| Function                  | Location                                  | Demonstrates                                             |
+|---------------------------|-------------------------------------------|----------------------------------------------------------|
+| `element_description_set` | `pcs/lib/commands/cib.py`                 | Simple CIB-modifying command                             |
+| `element_description_get` | `pcs/lib/commands/cib.py`                 | Simple CIB-reading command                               |
+| `set_properties`          | `pcs/lib/commands/cluster_property.py`    | Validation / modification split                          |
+| `create_alert`            | `pcs/lib/commands/alert.py`               | Validation / modification split, `IdProvider`            |
+| `create_plain_with_rule`  | `pcs/lib/commands/constraint/location.py` | Validator class with intermediate results, `IdProvider`  |
+| `create_with_set`         | `pcs/lib/commands/constraint/ticket.py`   | Multi-step validation, value normalization, `IdProvider` |
