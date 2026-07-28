@@ -68,7 +68,10 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {"cipher": "none", "hash": "none"},
                 {"cipher": "aes256", "hash": "sha256"},
             ),
-            [],
+            [
+                self.fixture_cipher_none_deprecated,
+                self.fixture_hash_none_deprecated,
+            ],
         )
 
     def test_crypto_config_enabled_set_to_default(self):
@@ -95,7 +98,10 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
             self.call_function(
                 {}, {}, {"hash": "none"}, {"cipher": "aes256", "hash": "sha256"}
             ),
-            [self.fixture_error_prerequisite],
+            [
+                self.fixture_hash_none_deprecated,
+                self.fixture_error_prerequisite,
+            ],
         )
 
     def test_crypto_config_enabled_changed_hash(self):
@@ -136,7 +142,10 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {"cipher": "aes128", "hash": "none"},
                 {"hash": "sha256"},
             ),
-            [self.fixture_error_prerequisite],
+            [
+                self.fixture_hash_none_deprecated,
+                self.fixture_error_prerequisite,
+            ],
         )
 
     def test_crypto_config_hash_enabled_enable_cipher_default_hash(self):

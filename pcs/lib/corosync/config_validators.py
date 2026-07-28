@@ -1471,9 +1471,11 @@ def _get_transport_knet_crypto_validators(
 ) -> list[validate.ValidatorInterface]:
     validators = [
         validate.ValueIn("cipher", ("none", "aes256", "aes192", "aes128")),
+        validate.ValueDeprecated("cipher", {"none": None}),
         validate.ValueIn(
             "hash", ("none", "md5", "sha1", "sha256", "sha384", "sha512")
         ),
+        validate.ValueDeprecated("hash", {"none": None}),
         validate.ValueIn("model", ("nss", "openssl")),
     ]
     if allow_empty_values:

@@ -6,7 +6,12 @@
 - Command `pcs stonith update-scsi-devices` no longer triggers unnecessary
   resource restarts when updating SCSI devices. ([RHEL-214140])
 
+### Deprecated
+- Disabling cluster traffic encryption (setting knet transport crypto options
+  `cipher` or `hash` to `none`) ([RHEL-218000])
+
 [RHEL-214140]: https://redhat.atlassian.net/browse/RHEL-214140
+[RHEL-218000]: https://redhat.atlassian.net/browse/RHEL-218000
 
 
 ## [0.12.3] - 2026-07-01

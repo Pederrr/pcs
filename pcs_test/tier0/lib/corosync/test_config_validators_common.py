@@ -18,6 +18,18 @@ class TransportKnetBase:
         prerequisite_name="hash",
         prerequisite_type="crypto",
     )
+    fixture_cipher_none_deprecated = fixture.deprecation(
+        report_codes.DEPRECATED_OPTION_VALUE,
+        option_name="cipher",
+        deprecated_value="none",
+        replaced_by=None,
+    )
+    fixture_hash_none_deprecated = fixture.deprecation(
+        report_codes.DEPRECATED_OPTION_VALUE,
+        option_name="hash",
+        deprecated_value="none",
+        replaced_by=None,
+    )
 
     def call_function(
         self,
@@ -405,7 +417,10 @@ class TransportKnetBase:
                     "hash": "none",
                 },
             ),
-            [],
+            [
+                self.fixture_cipher_none_deprecated,
+                self.fixture_hash_none_deprecated,
+            ],
         )
 
     def test_crypto_enabled_cipher_disabled_hash(self):
@@ -418,7 +433,10 @@ class TransportKnetBase:
                     "hash": "none",
                 },
             ),
-            [self.fixture_error_prerequisite],
+            [
+                self.fixture_hash_none_deprecated,
+                self.fixture_error_prerequisite,
+            ],
         )
 
     def test_crypto_enabled_cipher_default_hash(self):
@@ -442,7 +460,7 @@ class TransportKnetBase:
                     "cipher": "none",
                 },
             ),
-            [],
+            [self.fixture_cipher_none_deprecated],
         )
 
     def test_crypto_enabled_hash_disabled_cipher(self):
@@ -455,7 +473,7 @@ class TransportKnetBase:
                     "hash": "sha256",
                 },
             ),
-            [],
+            [self.fixture_cipher_none_deprecated],
         )
 
     def test_crypto_enabled_hash_default_cipher(self):
@@ -479,7 +497,7 @@ class TransportKnetBase:
                     "hash": "none",
                 },
             ),
-            [],
+            [self.fixture_hash_none_deprecated],
         )
 
 

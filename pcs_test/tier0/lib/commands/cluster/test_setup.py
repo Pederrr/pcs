@@ -2209,7 +2209,23 @@ class TransportKnetSuccess(TestCase):
             crypto_options=crypto_options,
         )
         self.env_assist.assert_reports(
-            reports_success_minimal_fixture(using_known_hosts_addresses=False)
+            [
+                fixture.deprecation(
+                    reports.codes.DEPRECATED_OPTION_VALUE,
+                    option_name="cipher",
+                    deprecated_value="none",
+                    replaced_by=None,
+                ),
+                fixture.deprecation(
+                    reports.codes.DEPRECATED_OPTION_VALUE,
+                    option_name="hash",
+                    deprecated_value="none",
+                    replaced_by=None,
+                ),
+            ]
+            + reports_success_minimal_fixture(
+                using_known_hosts_addresses=False
+            ),
         )
 
 
