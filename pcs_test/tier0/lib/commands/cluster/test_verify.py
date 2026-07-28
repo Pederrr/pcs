@@ -1,7 +1,7 @@
 from unittest import TestCase, mock
 
 from pcs import settings
-from pcs.common.reports import codes as report_codes
+from pcs.common import reports
 from pcs.lib.commands.cluster import verify
 
 from pcs_test.tools import fixture
@@ -20,11 +20,11 @@ BAD_FENCING_TOPOLOGY = """
 """
 BAD_FENCING_TOPOLOGY_REPORTS = [
     fixture.error(
-        report_codes.STONITH_RESOURCES_DO_NOT_EXIST,
+        reports.codes.STONITH_RESOURCES_DO_NOT_EXIST,
         stonith_ids=["FX"],
     ),
     fixture.error(
-        report_codes.NODE_NOT_FOUND,
+        reports.codes.NODE_NOT_FOUND,
         node="node1",
         searched_types=[],
     ),
@@ -39,12 +39,14 @@ BAD_RESOURCES = """
 """
 BAD_RESOURCES_REPORTS = [
     fixture.error(
-        report_codes.RESOURCE_BUNDLE_UNSUPPORTED_CONTAINER_TYPE,
+        reports.codes.RESOURCE_BUNDLE_UNSUPPORTED_CONTAINER_TYPE,
         bundle_id="bundle-bad",
         supported_container_types=["docker", "podman"],
         updating_options=False,
     ),
 ]
+
+_API_SCHEMA_PATH = rc("pcmk_rng/api/api-result.rng")
 
 
 class AssertInvalidCibMixin:
@@ -62,7 +64,7 @@ class AssertInvalidCibMixin:
         self.env_assist.assert_reports(
             [
                 fixture.error(
-                    report_codes.INVALID_CIB_CONTENT,
+                    reports.codes.INVALID_CIB_CONTENT,
                     report=report,
                     can_be_more_verbose=can_be_more_verbose,
                 ),
@@ -71,37 +73,38 @@ class AssertInvalidCibMixin:
         )
 
 
-@mock.patch.object(
-    settings, "pacemaker_api_result_schema", rc("pcmk_rng/api/api-result.rng")
-)
+@mock.patch.object(settings, "pacemaker_api_result_schema", _API_SCHEMA_PATH)
 class CibAsWholeValid(TestCase):
     def setUp(self):
         self.env_assist, self.config = get_env_tools(test_case=self)
         self.config.runner.pcmk.verify()
 
     def test_success_on_valid(self):
-        self.config.runner.cib.load().runner.pcmk.load_state()
+        self.config.runner.cib.load()
+        self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         verify(self.env_assist.get_env())
 
     def test_fail_on_invalid_fence_topology(self):
-        self.config.runner.cib.load(
-            optional_in_conf=BAD_FENCING_TOPOLOGY
-        ).runner.pcmk.load_state()
+        self.config.runner.cib.load(optional_in_conf=BAD_FENCING_TOPOLOGY)
+        self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         self.env_assist.assert_raise_library_error(
             lambda: verify(self.env_assist.get_env())
         )
         self.env_assist.assert_reports(BAD_FENCING_TOPOLOGY_REPORTS)
 
     def test_fail_on_invalid_bundle_containers(self):
-        self.config.runner.cib.load(
-            resources=BAD_RESOURCES
-        ).runner.pcmk.load_state()
+        self.config.runner.cib.load(resources=BAD_RESOURCES)
+        self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         self.env_assist.assert_raise_library_error(
             lambda: verify(self.env_assist.get_env())
         )
         self.env_assist.assert_reports(BAD_RESOURCES_REPORTS)
 
 
+@mock.patch.object(settings, "pacemaker_api_result_schema", _API_SCHEMA_PATH)
 class CibAsWholeInvalid(TestCase, AssertInvalidCibMixin):
     def setUp(self):
         self.env_assist, self.config = get_env_tools(test_case=self)
@@ -113,35 +116,27 @@ class CibAsWholeInvalid(TestCase, AssertInvalidCibMixin):
         self.config.runner.cib.load(returncode=1)
         self.assert_raises_invalid_cib_content(CRM_VERIFY_ERROR_REPORT_LINES[0])
 
-    @mock.patch.object(
-        settings,
-        "pacemaker_api_result_schema",
-        rc("pcmk_rng/api/api-result.rng"),
-    )
     def test_continue_on_loadable_cib(self):
-        self.config.runner.cib.load().runner.pcmk.load_state()
+        self.config.runner.cib.load()
+        self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         self.assert_raises_invalid_cib_content(CRM_VERIFY_ERROR_REPORT_LINES[0])
 
-    @mock.patch.object(
-        settings,
-        "pacemaker_api_result_schema",
-        rc("pcmk_rng/api/api-result.rng"),
-    )
     def test_add_following_errors(self):
         # More fencing topology tests are provided by tests of
         # pcs.lib.commands.fencing_topology
         self.config.runner.cib.load(
             resources=BAD_RESOURCES, optional_in_conf=BAD_FENCING_TOPOLOGY
-        ).runner.pcmk.load_state()
+        )
+        self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         self.assert_raises_invalid_cib_content(
             CRM_VERIFY_ERROR_REPORT_LINES[0],
             extra_reports=BAD_FENCING_TOPOLOGY_REPORTS + BAD_RESOURCES_REPORTS,
         )
 
 
-@mock.patch.object(
-    settings, "pacemaker_api_result_schema", rc("pcmk_rng/api/api-result.rng")
-)
+@mock.patch.object(settings, "pacemaker_api_result_schema", _API_SCHEMA_PATH)
 class CibIsMocked(TestCase, AssertInvalidCibMixin):
     def setUp(self):
         self.env_assist, self.config = get_env_tools(test_case=self)
@@ -155,6 +150,7 @@ class CibIsMocked(TestCase, AssertInvalidCibMixin):
         )
         self.config.runner.cib.load(env=self.cmd_env)
         self.config.runner.pcmk.load_state(env=self.cmd_env)
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         verify(self.env_assist.get_env())
 
     def test_fail_on_invalid_cib(self):
@@ -165,12 +161,11 @@ class CibIsMocked(TestCase, AssertInvalidCibMixin):
         )
         self.config.runner.cib.load(env=self.cmd_env)
         self.config.runner.pcmk.load_state(env=self.cmd_env)
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         self.assert_raises_invalid_cib_content(CRM_VERIFY_ERROR_REPORT_LINES[0])
 
 
-@mock.patch.object(
-    settings, "pacemaker_api_result_schema", rc("pcmk_rng/api/api-result.rng")
-)
+@mock.patch.object(settings, "pacemaker_api_result_schema", _API_SCHEMA_PATH)
 class VerboseMode(TestCase, AssertInvalidCibMixin):
     def setUp(self):
         self.env_assist, self.config = get_env_tools(test_case=self)
@@ -179,6 +174,7 @@ class VerboseMode(TestCase, AssertInvalidCibMixin):
         self.config.runner.pcmk.verify(verbose=True)
         self.config.runner.cib.load()
         self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         verify(self.env_assist.get_env(), verbose=True)
 
     def test_fail_on_invalid_cib(self):
@@ -188,6 +184,7 @@ class VerboseMode(TestCase, AssertInvalidCibMixin):
         )
         self.config.runner.cib.load()
         self.config.runner.pcmk.load_state()
+        self.config.fs.isfile(_API_SCHEMA_PATH)
         self.assert_raises_invalid_cib_content(
             CRM_VERIFY_ERROR_REPORT_LINES[0],
             can_be_more_verbose=False,
