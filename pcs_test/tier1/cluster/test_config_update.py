@@ -185,6 +185,8 @@ class UpdateLocal(AssertPcsMixin, TestCase):
                 "non-negative integer\n"
                 "Error: If crypto option 'cipher' is enabled, crypto option "
                 "'hash' must be enabled as well\n"
+                "Deprecation Warning: Disabling cluster traffic encryption is "
+                "deprecated and will not be possible in a future version\n"
                 "Error: Errors have occurred, therefore pcs is unable to "
                 "continue\n"
             ),

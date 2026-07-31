@@ -1436,6 +1436,9 @@ class Validation(TestCase):
                     allowed=["cipher", "hash", "model"],
                     allowed_patterns=[],
                 ),
+                fixture.deprecation(
+                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                ),
                 fixture.error(
                     reports.codes.INVALID_OPTIONS,
                     option_names=["b"],
@@ -2209,7 +2212,14 @@ class TransportKnetSuccess(TestCase):
             crypto_options=crypto_options,
         )
         self.env_assist.assert_reports(
-            reports_success_minimal_fixture(using_known_hosts_addresses=False)
+            [
+                fixture.deprecation(
+                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                ),
+            ]
+            + reports_success_minimal_fixture(
+                using_known_hosts_addresses=False
+            ),
         )
 
 

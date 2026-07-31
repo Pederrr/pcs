@@ -190,7 +190,13 @@ class UpdateConfig(TestCase):
             dict.fromkeys(ALLOWED_CRYPTO_OPTIONS, ""),
             dict.fromkeys(ALLOWED_TOTEM_OPTIONS, ""),
         )
-        self.env_assist.assert_reports([])
+        self.env_assist.assert_reports(
+            [
+                fixture.deprecation(
+                    report_codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                ),
+            ]
+        )
 
     def test_unknown_options_and_values(self):
         self.config.corosync_conf.load_content(fixture_totem())

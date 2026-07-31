@@ -1546,11 +1546,11 @@ def create_transport_knet(
         allow_empty_values=False,
     )
 
-    if (
-        # default values taken from `man corosync.conf`
-        crypto_options.get("cipher", "none") != "none"
-        and crypto_options.get("hash", "none") == "none"
-    ):
+    # default values taken from `man corosync.conf`
+    crypto_cipher = crypto_options.get("cipher", "none")
+    crypto_hash = crypto_options.get("hash", "none")
+
+    if crypto_cipher != "none" and crypto_hash == "none":
         report_items.append(
             ReportItem.error(
                 reports.messages.PrerequisiteOptionMustBeEnabledAsWell(
@@ -1559,6 +1559,16 @@ def create_transport_knet(
                     option_type="crypto",
                     prerequisite_type="crypto",
                 )
+            )
+        )
+
+    # If crypto or hash isn't specified, corosync will use default values,
+    # which equal to 'none'. This means traffic encryption is disabled,
+    # therefore we emit a message pointing that out.
+    if crypto_cipher in ("", "none") or crypto_hash in ("", "none"):
+        report_items.append(
+            reports.ReportItem.deprecation(
+                reports.messages.CorosyncConfigDisablingEncryptionDeprecated()
             )
         )
 
@@ -1590,16 +1600,14 @@ def update_transport_knet(
     #   1. set it to "none"
     #   2. set it to default, which is "none" according to `man corosync.conf`,
     #      by using value of empty string
-    crypto_cipher_enabled = crypto_options.get(
-        "cipher",
-        current_crypto_options.get("cipher", "none"),
-    ) not in ["none", ""]
+    disabled = ("", "none")
+    current_cipher = current_crypto_options.get("cipher", "none")
+    final_cipher = crypto_options.get("cipher", current_cipher)
+    current_hash = current_crypto_options.get("hash", "none")
+    final_hash = crypto_options.get("hash", current_hash)
 
-    crypto_hash_disabled = crypto_options.get(
-        "hash",
-        current_crypto_options.get("hash", "none"),
-    ) in ["none", ""]
-
+    crypto_cipher_enabled = final_cipher not in disabled
+    crypto_hash_disabled = final_hash in disabled
     if crypto_cipher_enabled and crypto_hash_disabled:
         report_items.append(
             ReportItem.error(
@@ -1609,6 +1617,22 @@ def update_transport_knet(
                     option_type="crypto",
                     prerequisite_type="crypto",
                 )
+            )
+        )
+
+    # When encryption settings are being set in such a way that the encryption
+    # will be disabled, emit a message. It doesn't matter whether the encryption
+    # was disabled already: 1) the user may not know that, it might have been
+    # set like that long time ago 2) it would be inconsistent and therefore
+    # confusing not to emit the message in such case.
+    # When encryption options are not being changed, do not warn even if the
+    # encryption is disabled. It would be confusing to the user otherwise.
+    if (
+        "cipher" in crypto_options and crypto_options["cipher"] in disabled
+    ) or ("hash" in crypto_options and crypto_options["hash"] in disabled):
+        report_items.append(
+            reports.ReportItem.deprecation(
+                reports.messages.CorosyncConfigDisablingEncryptionDeprecated()
             )
         )
 
