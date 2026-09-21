@@ -1,20 +1,31 @@
 import json
 import os
+import socket
 import ssl
 import time
-from collections.abc import Generator, Mapping
+from abc import ABC, abstractmethod
+from collections.abc import Iterator, Mapping
+from http.client import HTTPConnection, HTTPResponse
 from ipaddress import AddressValueError, IPv6Address
 from logging import Logger
 from typing import Any, TypeVar
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import AbstractHTTPHandler, Request, build_opener, urlopen
 
 from pcs import settings
-from pcs.common.async_tasks.dto import TaskIdentDto, TaskResultDto
+from pcs.common.async_tasks.dto import (
+    CommandDto,
+    CommandOptionsDto,
+    TaskIdentDto,
+    TaskResultDto,
+)
 from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.interface.dto import DataTransferObject, from_dict, to_dict
-from pcs.common.reports import report_dto_to_item
-from pcs.common.reports.item import ReportItem, ReportItemContext
+from pcs.common.reports import (
+    ReportItemContext,
+    ReportItemList,
+    report_dto_to_item,
+)
 from pcs.lib.external import is_proxy_set
 
 # There can be self signed certificates.
@@ -39,60 +50,207 @@ class ApiV2RequestError(Exception):
     """The request payload is invalid; retrying on another node won't help."""
 
 
-class NodeConnector:
+class _UnixSocketHttpConnection(HTTPConnection):
+    """
+    HTTP connection over a Unix domain socket instead of a TCP socket.
+    """
+
+    def __init__(
+        self,
+        host: str,
+        socket_path: str | None = None,
+        **kwargs: Any,
+    ):
+        # `host` is required by `HTTPConnection` (it ends up in the `Host`
+        # header) but the actual endpoint is the Unix socket at `socket_path`.
+        super().__init__(host, **kwargs)
+
+        # We have to provide default value for `socket_path` variable to make
+        # this class work properly with urllib. But we always want the path
+        # to be present
+        if socket_path is None:
+            raise ValueError(
+                "`socket_path` is required for unix socket connections"
+            )
+        self._socket_path = socket_path
+
+    def connect(self) -> None:
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.settimeout(self.timeout)
+        self.sock.connect(self._socket_path)
+
+
+class _UnixSocketHttpHandler(AbstractHTTPHandler):
+    """
+    urllib handler routing `unix://` requests through a Unix socket.
+    """
+
+    def __init__(self, socket_path: str, debuglevel: int | None = None):
+        super().__init__(debuglevel)
+        self._socket_path = socket_path
+
+    # urllib wires schemes to handlers to by method names. So unix:// urls will be
+    # opened with this method
+    def unix_open(self, req: Request) -> HTTPResponse:
+        return self.do_open(
+            _UnixSocketHttpConnection,
+            req,
+            socket_path=self._socket_path,
+        )
+
+    # Reuse the HTTP request preprocessing (Host, Content-Length, ...) for the
+    # custom 'unix://' scheme.
+    unix_request = AbstractHTTPHandler.do_request_
+
+
+class _Transport(ABC):
+    """
+    Encapsulates how an APIv2 request is addressed and dispatched.
+    """
+
+    @property
+    @abstractmethod
+    def label(self) -> str:
+        """
+        Human readable endpoint identifier used in log messages.
+        """
+
+    @abstractmethod
+    def build_url(self, path: str) -> str:
+        """
+        Return valid URL for the given transport
+
+        path -- path for the endpoint, begining with '/'
+        """
+
+    @property
+    @abstractmethod
+    def auth_headers(self) -> dict[str, str]:
+        """
+        Authentication headers to attach to every request
+        """
+
+    @abstractmethod
+    def open(self, request: Request, timeout: int) -> HTTPResponse:
+        """
+        Send `request` and return the raw response context manager.
+
+        request -- urllib request we want to send
+        timeout -- timeout for the request
+        """
+
+
+class _HttpsTransport(_Transport):
+    """
+    Talk to a remote node over HTTPS using a token cookie for auth.
+    """
+
+    def __init__(self, addr: str, port: int, token: str, node_name: str):
+        self._host = f"{_format_addr_for_url(addr)}:{port}"
+        self._token = token
+        self._node_name = node_name
+
+    @property
+    def label(self) -> str:
+        return self._node_name
+
+    def build_url(self, path: str) -> str:
+        return f"https://{self._host}{path}"
+
+    @property
+    def auth_headers(self) -> dict[str, str]:
+        return {"Cookie": f"token={self._token}"}
+
+    def open(self, request: Request, timeout: int) -> HTTPResponse:
+        return urlopen(
+            request, context=_UNVERIFIED_SSL_CONTEXT, timeout=timeout
+        )
+
+
+class _UnixSocketTransport(_Transport):
+    """
+    Talk to the local pcsd over its Unix domain socket.
+    """
+
+    def __init__(self, socket_path: str):
+        self._socket_path = socket_path
+        self._opener = build_opener(_UnixSocketHttpHandler(socket_path))
+
+    @property
+    def label(self) -> str:
+        return "localhost"
+
+    def build_url(self, path: str) -> str:
+        # The host is irrelevant for a Unix socket connection but urllib
+        # requires a non-empty host; the connection ignores it and it only
+        # ends up in the Host header. The actual endpoint is the socket path
+        # carried by the handler.
+        return f"unix://localhost{path}"
+
+    @property
+    def auth_headers(self) -> dict[str, str]:
+        # No auth headers needed, the deamon authenticates the caller from the
+        # socker peer cretentials (SO_PEERCRED)
+        return {}
+
+    def open(self, request: Request, timeout: int) -> Any:
+        return self._opener.open(request, timeout=timeout)
+
+
+class NodeConnector:  # TODO: think of a better name
     def __init__(
         self,
         logger: Logger,
-        addr: str,
-        port: int,
-        token: str,
-        node_name: str,
+        transport: _Transport,
         effective_username: str | None,
         effective_groups: list[str] | None,
         request_timeout: int,
     ):
         self._logger = logger
-        self._host = f"{_format_addr_for_url(addr)}:{port}"
-        self._token = token
-        self._node_name = node_name
+        self._transport = transport
         self._effective_username = effective_username
         self._effective_groups = effective_groups
         self._request_timeout = request_timeout
 
-    def task_create(self, cmd_payload: Mapping[str, Any]) -> str:
-        payload = {
-            **cmd_payload,
-            "options": {
-                **cmd_payload.get("options", {}),
-                **self._effective_user_options(),
-            },
-        }
+    def task_create(
+        self, command_name: str, command_params: Mapping[str, Any]
+    ) -> str:
+        payload = CommandDto(
+            command_name,
+            dict(command_params),
+            CommandOptionsDto(
+                effective_username=self._effective_username,
+                effective_groups=self._effective_groups,
+            ),
+        )
         request = Request(
-            f"https://{self._host}/api/v2/task/create",
-            data=json.dumps(payload).encode("utf-8"),
+            self._transport.build_url("/api/v2/task/create"),
+            data=json.dumps(to_dict(payload)).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
-                "Cookie": f"token={self._token}",
+                **self._transport.auth_headers,
             },
             method="POST",
         )
         response = self._send_request(request, request_error_on_400=True)
         task_ident = self._parse_response(response, TaskIdentDto).task_ident
-        self._logger.info("Created task %s on %s", task_ident, self._host)
+        self._logger.info(
+            "Created task %s on %s", task_ident, self._transport.label
+        )
         return task_ident
 
     def task_result(
-        self,
-        task_ident: str,
-        poll_interval: float = 1.0,
-    ) -> Generator[tuple[list[ReportItem], bool, Any], None, None]:
+        self, task_ident: str, poll_interval: float = 1.0
+    ) -> Iterator[tuple[ReportItemList, bool, Any]]:
         request = Request(
-            f"https://{self._host}/api/v2/task/result?task_ident={task_ident}",
-            headers={"Cookie": f"token={self._token}"},
-            method="GET",
+            self._transport.build_url(
+                f"/api/v2/task/result?task_ident={task_ident}"
+            ),
+            headers=self._transport.auth_headers,
         )
         reports_seen = 0
-        context = ReportItemContext(self._node_name)
+        # TODO - dont do this if localhost. At the same time, what if the reports already have some context ????
+        context = ReportItemContext(self._transport.label)
 
         # Poll indefinitely until node returns a finished state. No timeout
         # parameter — APIv2 supports long-running tasks. This hardcoded
@@ -122,21 +280,13 @@ class NodeConnector:
             )
             return
 
-    def _effective_user_options(self) -> dict[str, Any]:
-        options: dict[str, Any] = {}
-        if self._effective_username:
-            options["effective_username"] = self._effective_username
-        if self._effective_groups:
-            options["effective_groups"] = self._effective_groups
-        return options
-
     def _parse_response(self, response: str, dto_class: type[_DTO]) -> _DTO:
         try:
             return from_dict(dto_class, json.loads(response))
         except Exception as e:
             self._logger.error(
                 "Response from %s does not conform to %s %s",
-                self._host,
+                self._transport.label,
                 dto_class.__name__,
                 e,
             )
@@ -152,10 +302,8 @@ class NodeConnector:
             # lightweight server-side operations that should respond quickly.
             # The long-running part is the polling loop in task_result, which
             # is intentionally unbounded.
-            with urlopen(
-                request,
-                context=_UNVERIFIED_SSL_CONTEXT,
-                timeout=self._request_timeout,
+            with self._transport.open(
+                request, self._request_timeout
             ) as response:
                 return response.read().decode("utf-8")
         except HTTPError as e:
@@ -252,12 +400,17 @@ class ApiV2Client:
     def node_connector(
         self, addr: str, port: int, token: str, node_name: str
     ) -> NodeConnector:
+        return self._connector(_HttpsTransport(addr, port, token, node_name))
+
+    def local_connector(
+        self, socket_path: str = settings.pcsd_unix_socket
+    ) -> NodeConnector:
+        return self._connector(_UnixSocketTransport(socket_path))
+
+    def _connector(self, transport: _Transport) -> NodeConnector:
         return NodeConnector(
             self._logger,
-            addr,
-            port,
-            token,
-            node_name,
+            transport,
             self._effective_username,
             self._effective_groups,
             self._request_timeout,
