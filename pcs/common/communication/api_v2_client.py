@@ -89,7 +89,7 @@ class _UnixSocketHttpHandler(AbstractHTTPHandler):
         super().__init__(debuglevel)
         self._socket_path = socket_path
 
-    # urllib wires schemes to handlers to by method names. So unix:// urls will be
+    # urllib wires schemes to handlers by method names. So unix:// urls will be
     # opened with this method
     def unix_open(self, req: Request) -> HTTPResponse:
         return self.do_open(
@@ -116,27 +116,36 @@ class _Transport(ABC):
         """
 
     @abstractmethod
-    def build_url(self, path: str) -> str:
+    def _build_url(self, path: str) -> str:
         """
         Return valid URL for the given transport
 
-        path -- path for the endpoint, begining with '/'
+        path -- path for the endpoint, beginning with '/'
         """
 
     @property
     @abstractmethod
-    def auth_headers(self) -> dict[str, str]:
+    def _auth_headers(self) -> dict[str, str]:
         """
         Authentication headers to attach to every request
         """
 
+    def build_request(self, path: str, json_body: bytes | None) -> Request:
+        headers = (
+            {"Content-Type": "application/json"}
+            if json_body is not None
+            else {}
+        )
+        return Request(
+            self._build_url(path),
+            data=json_body,
+            headers={**headers, **self._auth_headers},
+        )
+
     @abstractmethod
     def open(self, request: Request, timeout: int) -> HTTPResponse:
         """
-        Send `request` and return the raw response context manager.
-
-        request -- urllib request we want to send
-        timeout -- timeout for the request
+        Send request and return the raw response context manager.
         """
 
 
@@ -154,11 +163,11 @@ class _HttpsTransport(_Transport):
     def label(self) -> str:
         return self._node_name
 
-    def build_url(self, path: str) -> str:
+    def _build_url(self, path: str) -> str:
         return f"https://{self._host}{path}"
 
     @property
-    def auth_headers(self) -> dict[str, str]:
+    def _auth_headers(self) -> dict[str, str]:
         return {"Cookie": f"token={self._token}"}
 
     def open(self, request: Request, timeout: int) -> HTTPResponse:
@@ -178,9 +187,9 @@ class _UnixSocketTransport(_Transport):
 
     @property
     def label(self) -> str:
-        return "localhost"
+        return f"localhost ({self._socket_path})"
 
-    def build_url(self, path: str) -> str:
+    def _build_url(self, path: str) -> str:
         # The host is irrelevant for a Unix socket connection but urllib
         # requires a non-empty host; the connection ignores it and it only
         # ends up in the Host header. The actual endpoint is the socket path
@@ -188,12 +197,12 @@ class _UnixSocketTransport(_Transport):
         return f"unix://localhost{path}"
 
     @property
-    def auth_headers(self) -> dict[str, str]:
-        # No auth headers needed, the deamon authenticates the caller from the
-        # socker peer cretentials (SO_PEERCRED)
+    def _auth_headers(self) -> dict[str, str]:
+        # No auth headers needed, the daemon authenticates the caller from the
+        # socket peer credentials (SO_PEERCRED)
         return {}
 
-    def open(self, request: Request, timeout: int) -> Any:
+    def open(self, request: Request, timeout: int) -> HTTPResponse:
         return self._opener.open(request, timeout=timeout)
 
 
@@ -223,14 +232,9 @@ class NodeConnector:  # TODO: think of a better name
                 effective_groups=self._effective_groups,
             ),
         )
-        request = Request(
-            self._transport.build_url("/api/v2/task/create"),
-            data=json.dumps(to_dict(payload)).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                **self._transport.auth_headers,
-            },
-            method="POST",
+        request = self._transport.build_request(
+            "/api/v2/task/create",
+            json_body=json.dumps(to_dict(payload)).encode("utf-8"),
         )
         response = self._send_request(request, request_error_on_400=True)
         task_ident = self._parse_response(response, TaskIdentDto).task_ident
@@ -242,11 +246,8 @@ class NodeConnector:  # TODO: think of a better name
     def task_result(
         self, task_ident: str, poll_interval: float = 1.0
     ) -> Iterator[tuple[ReportItemList, bool, Any]]:
-        request = Request(
-            self._transport.build_url(
-                f"/api/v2/task/result?task_ident={task_ident}"
-            ),
-            headers=self._transport.auth_headers,
+        request = self._transport.build_request(
+            f"/api/v2/task/result?task_ident={task_ident}", json_body=None
         )
         reports_seen = 0
         # TODO - dont do this if localhost. At the same time, what if the reports already have some context ????
