@@ -206,59 +206,72 @@ class _UnixSocketTransport(_Transport):
         return self._opener.open(request, timeout=timeout)
 
 
-class APIv2TaskRunner:
-    def __init__(
-        self,
-        logger: Logger,
-        transport: _Transport,
-        effective_username: str | None,
-        effective_groups: list[str] | None,
-        request_timeout: int,
-    ):
+class _ApiV2Client:
+    """
+    Low level client for APIv2
+    """
+
+    def __init__(self, logger: Logger):
         self._logger = logger
-        self._transport = transport
-        self._effective_username = effective_username
-        self._effective_groups = effective_groups
-        self._request_timeout = request_timeout
 
     def task_create(
-        self, command_name: str, command_params: Mapping[str, Any]
+        self, transport: _Transport, command: CommandDto, request_timeout: int
     ) -> str:
-        payload = CommandDto(
-            command_name,
-            dict(command_params),
-            CommandOptionsDto(
-                effective_username=self._effective_username,
-                effective_groups=self._effective_groups,
-            ),
-        )
-        request = self._transport.build_request(
+        """
+        Create a task using APIv2 and return its identifier
+
+        transport -- definition of the request target
+        command -- definition of the command to execute
+        request_timeout -- timeout for the requests
+        """
+        request = transport.build_request(
             "/api/v2/task/create",
-            json_body=json.dumps(to_dict(payload)).encode("utf-8"),
+            json_body=json.dumps(to_dict(command)).encode("utf-8"),
         )
-        response = self._send_request(request, request_error_on_400=True)
-        task_ident = self._parse_response(response, TaskIdentDto).task_ident
-        self._logger.info(
-            "Created task %s on %s", task_ident, self._transport.label
+        response = self._send_request(
+            transport,
+            request,
+            request_error_on_400=True,
+            request_timeout=request_timeout,
         )
+        task_ident = self._parse_response(
+            response, TaskIdentDto, transport.label
+        ).task_ident
+        self._logger.info("Created task %s on %s", task_ident, transport.label)
         return task_ident
 
     def task_result(
-        self, task_ident: str, poll_interval: float = 1.0
+        self,
+        transport: _Transport,
+        task_ident: str,
+        request_timeout: int,
+        poll_interval: float = 1.0,
     ) -> Iterator[tuple[ReportItemList, bool, Any]]:
-        request = self._transport.build_request(
+        """
+        Poll for the result of the specified task on the specified request
+        target. Return an iterator with new reports, task success, and any data
+        returned by the task
+
+        transport -- definition of the request target
+        task_ident -- identification of the task
+        request_timeout -- timeout for the requests
+        poll_interval -- describes how often the polling should happen, in seconds
+        """
+        request = transport.build_request(
             f"/api/v2/task/result?task_ident={task_ident}", json_body=None
         )
         reports_seen = 0
         # TODO - dont do this if localhost. At the same time, what if the reports already have some context ????
-        context = ReportItemContext(self._transport.label)
+        context = ReportItemContext(transport.label)
 
         # Poll indefinitely until node returns a finished state. No timeout
         # parameter — APIv2 supports long-running tasks. This hardcoded
         # behavior is intentional — no client needs anything else.
         while True:
-            response = self._send_request(request)
-            result_dto = self._parse_response(response, TaskResultDto)
+            response = self._send_request(transport, request, request_timeout)
+            result_dto = self._parse_response(
+                response, TaskResultDto, transport.label
+            )
 
             new_reports_dto = result_dto.reports[reports_seen:]
             reports_seen = len(result_dto.reports)
@@ -281,20 +294,26 @@ class APIv2TaskRunner:
             )
             return
 
-    def _parse_response(self, response: str, dto_class: type[_DTO]) -> _DTO:
+    def _parse_response(
+        self, response: str, dto_class: type[_DTO], transport_label: str
+    ) -> _DTO:
         try:
             return from_dict(dto_class, json.loads(response))
         except Exception as e:
             self._logger.error(
                 "Response from %s does not conform to %s %s",
-                self._transport.label,
+                transport_label,
                 dto_class.__name__,
                 e,
             )
             raise ApiV2CommunicationError(f"Unexpected response: {e}") from e
 
     def _send_request(
-        self, request: Request, request_error_on_400: bool = False
+        self,
+        transport: _Transport,
+        request: Request,
+        request_timeout: int,
+        request_error_on_400: bool = False,
     ) -> str:
         try:
             self._logger.info("Sending request to %s", request.full_url)
@@ -303,9 +322,7 @@ class APIv2TaskRunner:
             # lightweight server-side operations that should respond quickly.
             # The long-running part is the polling loop in task_result, which
             # is intentionally unbounded.
-            with self._transport.open(
-                request, self._request_timeout
-            ) as response:
+            with transport.open(request, request_timeout) as response:
                 return response.read().decode("utf-8")
         except HTTPError as e:
             self._logger.info(
@@ -378,18 +395,25 @@ class APIv2TaskRunner:
             self._logger.info("Task %s kill reason: %s", ident, kill_reason)
 
 
-class ApiV2Client:
+class NodeApiV2Client:
+    """
+    APIv2 client for a specified target. Allows to run multiple commands on the
+    same node.
+    """
+
     CommunicationError = ApiV2CommunicationError
     RequestError = ApiV2RequestError
 
     def __init__(
         self,
         logger: Logger,
+        transport: _Transport,
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
     ):
         self._logger = logger
+        self._transport = transport
         self._effective_username = effective_username
         self._effective_groups = effective_groups
         self._request_timeout = (
@@ -397,22 +421,63 @@ class ApiV2Client:
             if request_timeout is not None
             else settings.default_request_timeout
         )
+        self._apiv2_client = _ApiV2Client(self._logger)
 
-    def node_task_runner(
-        self, addr: str, port: int, token: str, node_name: str
-    ) -> APIv2TaskRunner:
-        return self._task_runner(_HttpsTransport(addr, port, token, node_name))
+    @classmethod
+    def for_unix_socket(
+        cls,
+        unix_socket_path: str,
+        logger: Logger,
+        effective_username: str | None = None,
+        effective_groups: list[str] | None = None,
+        request_timeout: int | None = None,
+    ) -> "NodeApiV2Client":
+        return cls(
+            logger,
+            _UnixSocketTransport(unix_socket_path),
+            effective_username,
+            effective_groups,
+            request_timeout,
+        )
 
-    def local_task_runner(
-        self, socket_path: str = settings.pcsd_unix_socket
-    ) -> APIv2TaskRunner:
-        return self._task_runner(_UnixSocketTransport(socket_path))
+    def run_command(
+        self,
+        command_name: str,
+        command_params: Mapping[str, Any],
+        poll_interval: float = 1.0,
+    ) -> Iterator[tuple[ReportItemList, bool, Any]]:
+        """
+        Run an APIv2 command, and return an iterator with new reports, task
+        success, and any data returned by the task
 
-    def _task_runner(self, transport: _Transport) -> APIv2TaskRunner:
-        return APIv2TaskRunner(
-            self._logger,
-            transport,
-            self._effective_username,
-            self._effective_groups,
+        command_name -- name of the APIv2 command to execute
+        command_params -- params of the command
+        poll_interval -- interval in seconds, for polling of the command result
+        """
+
+        task_ident = self._create_task(command_name, command_params)
+        return self._get_task_result(task_ident, poll_interval)
+
+    def _create_task(
+        self, command_name: str, command_params: Mapping[str, Any]
+    ) -> str:
+        return self._apiv2_client.task_create(
+            self._transport,
+            CommandDto(
+                command_name=command_name,
+                params=dict(command_params),
+                options=CommandOptionsDto(
+                    request_timeout=self._request_timeout,
+                    effective_username=self._effective_username,
+                    effective_groups=self._effective_groups,
+                ),
+            ),
             self._request_timeout,
+        )
+
+    def _get_task_result(
+        self, task_ident: str, poll_interval: float = 1.0
+    ) -> Iterator[tuple[ReportItemList, bool, Any]]:
+        return self._apiv2_client.task_result(
+            self._transport, task_ident, self._request_timeout, poll_interval
         )

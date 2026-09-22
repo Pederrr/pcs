@@ -13,7 +13,7 @@ from pcs.cli.common.parse_args import (
 )
 from pcs.cli.reports.output import error, process_library_reports
 from pcs.common.auth import HostAuthData, HostWithTokenAuthData
-from pcs.common.communication.api_v2_client import ApiV2Client
+from pcs.common.communication.api_v2_client import NodeApiV2Client
 from pcs.common.host import Destination
 from pcs.common.str_tools import format_list
 
@@ -105,8 +105,9 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         #
         # TODO: APIv2 client/node connector will be provided from outside,
         # not created inside the CLI command handlers
-        client = ApiV2Client(logging.getLogger("pcs"))
-        task_runner = client.local_task_runner(settings.pcsd_unix_socket)
+        client = NodeApiV2Client.for_unix_socket(
+            settings.pcsd_unix_socket, logging.getLogger("pcs")
+        )
 
         # TODO: this loop and report handling will be encapsulated in some
         # wrapper for CLI
@@ -114,16 +115,15 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         # We ideally want to just call the command, and get result. Report and
         # error handling should be ideally handled transparently.
         try:
-            task_ident = task_runner.task_create(
-                "auth.deauth_hosts", dict(hosts=list(argv))
-            )
-
             success = False
-            for result in task_runner.task_result(task_ident):
+            for result in client.run_command(
+                "auth.deauth_hosts", dict(hosts=list(argv))
+            ):
                 new_reports, success, _ = result
                 # TODO context is added to the reports :( - we should deal with this
                 # it looks stupid to add "localhost" or anything to all of the reports
-                process_library_reports(new_reports, exit_on_error=False)
+                if new_reports:
+                    process_library_reports(new_reports, exit_on_error=False)
 
             if not success:
                 # TODO: we call this without reports just to provide the default CLI error message
