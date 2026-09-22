@@ -206,7 +206,7 @@ class _UnixSocketTransport(_Transport):
         return self._opener.open(request, timeout=timeout)
 
 
-class NodeConnector:  # TODO: think of a better name
+class APIv2TaskRunner:
     def __init__(
         self,
         logger: Logger,
@@ -398,18 +398,18 @@ class ApiV2Client:
             else settings.default_request_timeout
         )
 
-    def node_connector(
+    def node_task_runner(
         self, addr: str, port: int, token: str, node_name: str
-    ) -> NodeConnector:
-        return self._connector(_HttpsTransport(addr, port, token, node_name))
+    ) -> APIv2TaskRunner:
+        return self._task_runner(_HttpsTransport(addr, port, token, node_name))
 
-    def local_connector(
+    def local_task_runner(
         self, socket_path: str = settings.pcsd_unix_socket
-    ) -> NodeConnector:
-        return self._connector(_UnixSocketTransport(socket_path))
+    ) -> APIv2TaskRunner:
+        return self._task_runner(_UnixSocketTransport(socket_path))
 
-    def _connector(self, transport: _Transport) -> NodeConnector:
-        return NodeConnector(
+    def _task_runner(self, transport: _Transport) -> APIv2TaskRunner:
+        return APIv2TaskRunner(
             self._logger,
             transport,
             self._effective_username,

@@ -106,7 +106,7 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         # TODO: APIv2 client/node connector will be provided from outside,
         # not created inside the CLI command handlers
         client = ApiV2Client(logging.getLogger("pcs"))
-        node_connector = client.local_connector(settings.pcsd_unix_socket)
+        task_runner = client.local_task_runner(settings.pcsd_unix_socket)
 
         # TODO: this loop and report handling will be encapsulated in some
         # wrapper for CLI
@@ -114,12 +114,12 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         # We ideally want to just call the command, and get result. Report and
         # error handling should be ideally handled transparently.
         try:
-            task_ident = node_connector.task_create(
+            task_ident = task_runner.task_create(
                 "auth.deauth_hosts", dict(hosts=list(argv))
             )
 
             success = False
-            for result in node_connector.task_result(task_ident):
+            for result in task_runner.task_result(task_ident):
                 new_reports, success, _ = result
                 # TODO context is added to the reports :( - we should deal with this
                 # it looks stupid to add "localhost" or anything to all of the reports
