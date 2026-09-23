@@ -116,6 +116,28 @@ class _Transport(ABC):
         Human readable endpoint identifier used in log messages.
         """
 
+    def build_request(self, path: str, json_body: bytes | None) -> Request:
+        """
+        Create a request
+        """
+        headers = (
+            {"Content-Type": "application/json"}
+            if json_body is not None
+            else {}
+        )
+        # GET or POST is automatically used depending on the json_body
+        return Request(
+            self._build_url(path),
+            data=json_body,
+            headers={**headers, **self._auth_headers},
+        )
+
+    @abstractmethod
+    def open(self, request: Request, timeout: int) -> HTTPResponse:
+        """
+        Send request and return the raw response context manager.
+        """
+
     @abstractmethod
     def _build_url(self, path: str) -> str:
         """
@@ -131,38 +153,19 @@ class _Transport(ABC):
         Authentication headers to attach to every request
         """
 
-    def build_request(self, path: str, json_body: bytes | None) -> Request:
-        headers = (
-            {"Content-Type": "application/json"}
-            if json_body is not None
-            else {}
-        )
-        return Request(
-            self._build_url(path),
-            data=json_body,
-            headers={**headers, **self._auth_headers},
-        )
-
-    @abstractmethod
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
-        """
-        Send request and return the raw response context manager.
-        """
-
 
 class _HttpsTransport(_Transport):
     """
     Talk to a remote node over HTTPS using a token cookie for auth.
     """
 
-    def __init__(self, addr: str, port: int, token: str, node_name: str):
+    def __init__(self, addr: str, port: int, token: str):
         self._host = f"{_format_addr_for_url(addr)}:{port}"
         self._token = token
-        self._node_name = node_name
 
     @property
     def label(self) -> str:
-        return self._node_name
+        return self._host
 
     def _build_url(self, path: str) -> str:
         return f"https://{self._host}{path}"
@@ -188,7 +191,7 @@ class _UnixSocketTransport(_Transport):
 
     @property
     def label(self) -> str:
-        return f"localhost ({self._socket_path})"
+        return self._socket_path
 
     def _build_url(self, path: str) -> str:
         # The host is irrelevant for a Unix socket connection but urllib
@@ -396,7 +399,7 @@ class _ApiV2Client:
             self._logger.info("Task %s kill reason: %s", ident, kill_reason)
 
 
-class NodeApiV2Client:
+class ApiV2NodeConnector:
     """
     APIv2 client for a specified target. Allows to run multiple commands on the
     same node.
@@ -413,7 +416,6 @@ class NodeApiV2Client:
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
     ):
-        self._logger = logger
         self._transport = transport
         self._effective_username = effective_username
         self._effective_groups = effective_groups
@@ -422,7 +424,7 @@ class NodeApiV2Client:
             if request_timeout is not None
             else settings.default_request_timeout
         )
-        self._apiv2_client = _ApiV2Client(self._logger)
+        self._apiv2_client = _ApiV2Client(logger)
 
     @classmethod
     def for_unix_socket(
@@ -432,7 +434,7 @@ class NodeApiV2Client:
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
-    ) -> "NodeApiV2Client":
+    ) -> "ApiV2NodeConnector":
         return cls(
             logger,
             _UnixSocketTransport(unix_socket_path),
@@ -468,7 +470,6 @@ class NodeApiV2Client:
                 command_name=command_name,
                 params=dict(command_params),
                 options=CommandOptionsDto(
-                    request_timeout=self._request_timeout,
                     effective_username=self._effective_username,
                     effective_groups=self._effective_groups,
                 ),

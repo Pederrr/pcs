@@ -13,7 +13,7 @@ from pcs.cli.common.parse_args import (
 )
 from pcs.cli.reports.output import error, process_library_reports
 from pcs.common.auth import HostAuthData, HostWithTokenAuthData
-from pcs.common.communication.api_v2_client import NodeApiV2Client
+from pcs.common.communication.api_v2_client import ApiV2NodeConnector
 from pcs.common.host import Destination
 from pcs.common.str_tools import format_list
 
@@ -105,7 +105,7 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
         #
         # TODO: APIv2 client/node connector will be provided from outside,
         # not created inside the CLI command handlers
-        client = NodeApiV2Client.for_unix_socket(
+        client = ApiV2NodeConnector.for_unix_socket(
             settings.pcsd_unix_socket, logging.getLogger("pcs")
         )
 
