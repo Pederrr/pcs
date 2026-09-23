@@ -23,6 +23,7 @@ from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.interface.dto import DataTransferObject, from_dict, to_dict
 from pcs.common.reports import (
     ReportItemContext,
+    ReportItemDto,
     ReportItemList,
     report_dto_to_item,
 )
@@ -372,7 +373,7 @@ class _ApiV2Client:
         self,
         task_ident: str,
         result_dto: TaskResultDto,
-        new_reports_dto: list,
+        new_reports_dto: list[ReportItemDto],
     ) -> None:
         finish_type = result_dto.task_finish_type
         kill_reason = result_dto.kill_reason
