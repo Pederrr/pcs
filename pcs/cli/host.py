@@ -120,8 +120,6 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
                 "auth.deauth_hosts", dict(hosts=list(argv))
             ):
                 new_reports, success, _ = result
-                # TODO context is added to the reports :( - we should deal with this
-                # it looks stupid to add "localhost" or anything to all of the reports
                 if new_reports:
                     process_library_reports(new_reports, exit_on_error=False)
 

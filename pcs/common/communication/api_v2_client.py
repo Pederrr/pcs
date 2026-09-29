@@ -111,9 +111,16 @@ class _Transport(ABC):
 
     @property
     @abstractmethod
-    def label(self) -> str:
+    def log_label(self) -> str:
         """
         Human readable endpoint identifier used in log messages.
+        """
+
+    @property
+    @abstractmethod
+    def node_name(self) -> str | None:
+        """
+        Node name for report message contexts
         """
 
     def build_request(self, path: str, json_body: bytes | None) -> Request:
@@ -159,13 +166,18 @@ class _HttpsTransport(_Transport):
     Talk to a remote node over HTTPS using a token cookie for auth.
     """
 
-    def __init__(self, addr: str, port: int, token: str):
+    def __init__(self, addr: str, port: int, token: str, node_name: str):
         self._host = f"{_format_addr_for_url(addr)}:{port}"
         self._token = token
+        self._node_name = node_name
 
     @property
-    def label(self) -> str:
+    def log_label(self) -> str:
         return self._host
+
+    @property
+    def node_name(self) -> str | None:
+        return self._node_name
 
     def _build_url(self, path: str) -> str:
         return f"https://{self._host}{path}"
@@ -190,8 +202,14 @@ class _UnixSocketTransport(_Transport):
         self._opener = build_opener(_UnixSocketHttpHandler(socket_path))
 
     @property
-    def label(self) -> str:
+    def log_label(self) -> str:
         return self._socket_path
+
+    @property
+    def node_name(self) -> str | None:
+        # We don't want to report node name in reports from local node when
+        # using local unix socket
+        return None
 
     def _build_url(self, path: str) -> str:
         # The host is irrelevant for a Unix socket connection but urllib
@@ -239,9 +257,11 @@ class _ApiV2Client:
             request_timeout=request_timeout,
         )
         task_ident = self._parse_response(
-            response, TaskIdentDto, transport.label
+            response, TaskIdentDto, transport.log_label
         ).task_ident
-        self._logger.info("Created task %s on %s", task_ident, transport.label)
+        self._logger.info(
+            "Created task %s on %s", task_ident, transport.log_label
+        )
         return task_ident
 
     def task_result(
@@ -265,8 +285,11 @@ class _ApiV2Client:
             f"/api/v2/task/result?task_ident={task_ident}", json_body=None
         )
         reports_seen = 0
-        # TODO - dont do this if localhost. At the same time, what if the reports already have some context ????
-        context = ReportItemContext(transport.label)
+        context = (
+            None
+            if transport.node_name is None
+            else ReportItemContext(transport.node_name)
+        )
 
         # Poll indefinitely until node returns a finished state. No timeout
         # parameter — APIv2 supports long-running tasks. This hardcoded
@@ -274,7 +297,7 @@ class _ApiV2Client:
         while True:
             response = self._send_request(transport, request, request_timeout)
             result_dto = self._parse_response(
-                response, TaskResultDto, transport.label
+                response, TaskResultDto, transport.log_label
             )
 
             new_reports_dto = result_dto.reports[reports_seen:]
