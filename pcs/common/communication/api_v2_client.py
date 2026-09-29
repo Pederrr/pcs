@@ -166,6 +166,7 @@ class _HttpsTransport(_Transport):
     Talk to a remote node over HTTPS using a token cookie for auth.
     """
 
+    # TODO: this should use RequestTarget instead of these 4 values
     def __init__(self, addr: str, port: int, token: str, node_name: str):
         self._host = f"{_format_addr_for_url(addr)}:{port}"
         self._token = token
