@@ -73,11 +73,10 @@ class TcpTransport(Transport):
     Talk to a remote node over HTTPS using a token cookie for auth.
     """
 
-    # TODO: this should use RequestTarget instead of these 4 values
-    def __init__(self, addr: str, port: int, token: str, node_name: str):
+    # TODO: this should use RequestTarget instead of these values
+    def __init__(self, addr: str, port: int, token: str):
         self._host = f"{_format_addr_for_url(addr)}:{port}"
         self._token = token
-        self._node_name = node_name
 
     @property
     def label(self) -> str:
