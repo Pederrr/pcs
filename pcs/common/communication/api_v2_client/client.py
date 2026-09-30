@@ -231,7 +231,7 @@ class _ApiV2Client:
             self._logger.info("Task %s kill reason: %s", ident, kill_reason)
 
 
-class ApiV2NodeConnector:
+class ApiV2Connector:
     """
     APIv2 client for a specified target. Allows to run multiple commands on the
     same node.
@@ -266,7 +266,7 @@ class ApiV2NodeConnector:
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
-    ) -> "ApiV2NodeConnector":
+    ) -> "ApiV2Connector":
         return cls(
             logger,
             UnixSocketTransport(unix_socket_path),
