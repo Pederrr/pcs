@@ -43,7 +43,7 @@ class Transport(ABC):
         return Request(
             self._build_url(path),
             data=json_body,
-            headers={**headers, **self._auth_headers},
+            headers=self._build_headers(headers),
         )
 
     @abstractmethod
@@ -60,12 +60,12 @@ class Transport(ABC):
         path -- path for the endpoint, beginning with '/'
         """
 
-    @property
-    @abstractmethod
-    def _auth_headers(self) -> dict[str, str]:
+    def _build_headers(self, headers: dict[str, str]) -> dict[str, str]:
         """
-        Authentication headers to attach to every request
+        Create requests headers, add any necessary headers needed for specific
+        transports
         """
+        return headers
 
 
 class TcpTransport(Transport):
@@ -85,9 +85,8 @@ class TcpTransport(Transport):
     def _build_url(self, path: str) -> str:
         return f"https://{self._host}{path}"
 
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        return {"Cookie": f"token={self._token}"}
+    def _build_headers(self, headers: dict[str, str]) -> dict[str, str]:
+        return {**headers, "Cookie": f"token={self._token}"}
 
     def open(self, request: Request, timeout: float) -> HTTPResponse:
         return urlopen(
@@ -114,12 +113,6 @@ class UnixSocketTransport(Transport):
         # ends up in the Host header. The actual endpoint is the socket path
         # carried by the handler.
         return f"unix://localhost{path}"
-
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        # No auth headers needed, the daemon authenticates the caller from the
-        # socket peer credentials (SO_PEERCRED)
-        return {}
 
     def open(self, request: Request, timeout: float) -> HTTPResponse:
         return self._opener.open(request, timeout=timeout)
