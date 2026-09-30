@@ -25,7 +25,7 @@ class Transport(ABC):
 
     @property
     @abstractmethod
-    def host_label(self) -> str:
+    def label(self) -> str:
         """
         Human readable endpoint identifier.
         """
@@ -80,7 +80,7 @@ class TcpTransport(Transport):
         self._node_name = node_name
 
     @property
-    def host_label(self) -> str:
+    def label(self) -> str:
         return self._host
 
     def _build_url(self, path: str) -> str:
@@ -106,7 +106,7 @@ class UnixSocketTransport(Transport):
         self._opener = build_opener(UnixSocketHttpHandler(socket_path))
 
     @property
-    def host_label(self) -> str:
+    def label(self) -> str:
         return self._socket_path
 
     def _build_url(self, path: str) -> str:

@@ -65,11 +65,9 @@ class _ApiV2Client:
             json_body=json.dumps(to_dict(command)).encode("utf-8"),
         )
         response = self._send_request(request, request_error_on_400=True)
-        task_ident = self._parse_response(
-            response, TaskIdentDto, self._transport.host_label
-        ).task_ident
+        task_ident = self._parse_response(response, TaskIdentDto).task_ident
         self._logger.info(
-            "Created task %s on %s", task_ident, self._transport.host_label
+            "Created task %s on %s", task_ident, self._transport.label
         )
         return task_ident
 
@@ -93,9 +91,7 @@ class _ApiV2Client:
         # behavior is intentional — no client needs anything else.
         while True:
             response = self._send_request(request)
-            result_dto = self._parse_response(
-                response, TaskResultDto, self._transport.host_label
-            )
+            result_dto = self._parse_response(response, TaskResultDto)
 
             new_reports_dto = result_dto.reports[reports_seen:]
             reports_seen = len(result_dto.reports)
@@ -119,15 +115,13 @@ class _ApiV2Client:
             )
             return
 
-    def _parse_response(
-        self, response: str, dto_class: type[_DTO], transport_label: str
-    ) -> _DTO:
+    def _parse_response(self, response: str, dto_class: type[_DTO]) -> _DTO:
         try:
             return from_dict(dto_class, json.loads(response))
         except Exception as e:
             self._logger.error(
                 "Response from %s does not conform to %s %s",
-                transport_label,
+                self._transport.label,
                 dto_class.__name__,
                 e,
             )
