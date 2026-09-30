@@ -47,7 +47,7 @@ class Transport(ABC):
         )
 
     @abstractmethod
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
+    def open(self, request: Request, timeout: float) -> HTTPResponse:
         """
         Send request and return the raw response context manager.
         """
@@ -90,7 +90,7 @@ class TcpTransport(Transport):
     def _auth_headers(self) -> dict[str, str]:
         return {"Cookie": f"token={self._token}"}
 
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
+    def open(self, request: Request, timeout: float) -> HTTPResponse:
         return urlopen(
             request, context=_UNVERIFIED_SSL_CONTEXT, timeout=timeout
         )
@@ -122,5 +122,5 @@ class UnixSocketTransport(Transport):
         # socket peer credentials (SO_PEERCRED)
         return {}
 
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
+    def open(self, request: Request, timeout: float) -> HTTPResponse:
         return self._opener.open(request, timeout=timeout)

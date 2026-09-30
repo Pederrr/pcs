@@ -43,11 +43,11 @@ class _ApiV2Client:
         transport: Transport,
         logger: Logger,
         context_node_name: str | None = None,
-        request_timeout: int = settings.default_request_timeout,
+        api_v2_timeout: float = settings.default_request_timeout,
     ):
         self._logger = logger
         self._transport = transport
-        self._request_timeout = request_timeout
+        self._api_v2_timeout = api_v2_timeout
         self._report_item_context = (
             None
             if context_node_name is None
@@ -144,7 +144,7 @@ class _ApiV2Client:
             # The long-running part is the polling loop in task_result, which
             # is intentionally unbounded.
             with self._transport.open(
-                request, self._request_timeout
+                request, self._api_v2_timeout
             ) as response:
                 return response.read().decode("utf-8")
         except HTTPError as e:
@@ -231,15 +231,17 @@ class ApiV2Connector:
         self,
         logger: Logger,
         transport: Transport,
+        context_node_name: str | None = None,
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
-        context_node_name: str | None = None,
-        request_timeout: int = settings.default_request_timeout,
+        request_timeout: int | None = None,
+        api_v2_timeout: float = settings.default_request_timeout,
     ):
+        self._request_timeout = request_timeout
         self._effective_username = effective_username
         self._effective_groups = effective_groups
         self._apiv2_client = _ApiV2Client(
-            transport, logger, context_node_name, request_timeout
+            transport, logger, context_node_name, api_v2_timeout
         )
 
     @classmethod
@@ -249,15 +251,28 @@ class ApiV2Connector:
         logger: Logger,
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
-        request_timeout: int = settings.default_request_timeout,
+        request_timeout: int | None = None,
+        api_v2_timeout: float = settings.default_request_timeout,
     ) -> "ApiV2Connector":
+        """
+        Create connector for local unix socket
+
+        unix_socket_path -- file path of the unix socket
+        logger -- instance for logging
+        effective_username --
+        effective_groups --
+        request_timeout -- timeout for the requests done inside created APIv2
+            tasks
+        api_v2_timeout -- timeout for requests done to APIv2 endpoints
+        """
         return cls(
             logger,
             UnixSocketTransport(unix_socket_path),
+            None,
             effective_username,
             effective_groups,
-            None,
             request_timeout,
+            api_v2_timeout,
         )
 
     def run_command(
@@ -280,6 +295,7 @@ class ApiV2Connector:
                 command_name=command_name,
                 params=dict(command_params),
                 options=CommandOptionsDto(
+                    request_timeout=self._request_timeout,
                     effective_username=self._effective_username,
                     effective_groups=self._effective_groups,
                 ),
