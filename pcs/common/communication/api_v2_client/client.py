@@ -1,16 +1,11 @@
 import json
 import os
-import socket
-import ssl
 import time
-from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from http.client import HTTPConnection, HTTPResponse
-from ipaddress import AddressValueError, IPv6Address
 from logging import Logger
 from typing import Any, TypeVar
 from urllib.error import HTTPError, URLError
-from urllib.request import AbstractHTTPHandler, Request, build_opener, urlopen
+from urllib.request import Request
 
 from pcs import settings
 from pcs.common.async_tasks.dto import (
@@ -29,18 +24,9 @@ from pcs.common.reports import (
 )
 from pcs.lib.external import is_proxy_set
 
-# There can be self signed certificates.
-_UNVERIFIED_SSL_CONTEXT = ssl._create_unverified_context()  # noqa: SLF001
+from .transport import Transport, UnixSocketTransport
 
 _DTO = TypeVar("_DTO", bound=DataTransferObject)
-
-
-def _format_addr_for_url(addr: str) -> str:
-    try:
-        IPv6Address(addr)
-        return f"[{addr}]"
-    except AddressValueError:
-        return addr
 
 
 class ApiV2CommunicationError(Exception):
@@ -49,184 +35,6 @@ class ApiV2CommunicationError(Exception):
 
 class ApiV2RequestError(Exception):
     """The request payload is invalid; retrying on another node won't help."""
-
-
-class _UnixSocketHttpConnection(HTTPConnection):
-    """
-    HTTP connection over a Unix domain socket instead of a TCP socket.
-    """
-
-    def __init__(
-        self,
-        host: str,
-        socket_path: str | None = None,
-        **kwargs: Any,
-    ):
-        # `host` is required by `HTTPConnection` (it ends up in the `Host`
-        # header) but the actual endpoint is the Unix socket at `socket_path`.
-        super().__init__(host, **kwargs)
-
-        # We have to provide default value for `socket_path` variable to make
-        # this class work properly with urllib. But we always want the path
-        # to be present
-        if socket_path is None:
-            raise ValueError(
-                "`socket_path` is required for unix socket connections"
-            )
-        self._socket_path = socket_path
-
-    def connect(self) -> None:
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.settimeout(self.timeout)
-        self.sock.connect(self._socket_path)
-
-
-class _UnixSocketHttpHandler(AbstractHTTPHandler):
-    """
-    urllib handler routing `unix://` requests through a Unix socket.
-    """
-
-    def __init__(self, socket_path: str, debuglevel: int | None = None):
-        super().__init__(debuglevel)
-        self._socket_path = socket_path
-
-    # urllib wires schemes to handlers by method names. So unix:// urls will be
-    # opened with this method
-    def unix_open(self, req: Request) -> HTTPResponse:
-        return self.do_open(
-            _UnixSocketHttpConnection,
-            req,
-            socket_path=self._socket_path,
-        )
-
-    # Reuse the HTTP request preprocessing (Host, Content-Length, ...) for the
-    # custom 'unix://' scheme.
-    unix_request = AbstractHTTPHandler.do_request_
-
-
-class _Transport(ABC):
-    """
-    Encapsulates how an APIv2 request is addressed and dispatched.
-    """
-
-    @property
-    @abstractmethod
-    def log_label(self) -> str:
-        """
-        Human readable endpoint identifier used in log messages.
-        """
-
-    @property
-    @abstractmethod
-    def node_name(self) -> str | None:
-        """
-        Node name for report message contexts
-        """
-
-    def build_request(self, path: str, json_body: bytes | None) -> Request:
-        """
-        Create a request
-        """
-        headers = (
-            {"Content-Type": "application/json"}
-            if json_body is not None
-            else {}
-        )
-        # GET or POST is automatically used depending on the json_body
-        return Request(
-            self._build_url(path),
-            data=json_body,
-            headers={**headers, **self._auth_headers},
-        )
-
-    @abstractmethod
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
-        """
-        Send request and return the raw response context manager.
-        """
-
-    @abstractmethod
-    def _build_url(self, path: str) -> str:
-        """
-        Return valid URL for the given transport
-
-        path -- path for the endpoint, beginning with '/'
-        """
-
-    @property
-    @abstractmethod
-    def _auth_headers(self) -> dict[str, str]:
-        """
-        Authentication headers to attach to every request
-        """
-
-
-class _TcpTransport(_Transport):
-    """
-    Talk to a remote node over HTTPS using a token cookie for auth.
-    """
-
-    # TODO: this should use RequestTarget instead of these 4 values
-    def __init__(self, addr: str, port: int, token: str, node_name: str):
-        self._host = f"{_format_addr_for_url(addr)}:{port}"
-        self._token = token
-        self._node_name = node_name
-
-    @property
-    def log_label(self) -> str:
-        return self._host
-
-    @property
-    def node_name(self) -> str | None:
-        return self._node_name
-
-    def _build_url(self, path: str) -> str:
-        return f"https://{self._host}{path}"
-
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        return {"Cookie": f"token={self._token}"}
-
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
-        return urlopen(
-            request, context=_UNVERIFIED_SSL_CONTEXT, timeout=timeout
-        )
-
-
-class _UnixSocketTransport(_Transport):
-    """
-    Talk to the local pcsd over its Unix domain socket.
-    """
-
-    def __init__(self, socket_path: str):
-        self._socket_path = socket_path
-        self._opener = build_opener(_UnixSocketHttpHandler(socket_path))
-
-    @property
-    def log_label(self) -> str:
-        return self._socket_path
-
-    @property
-    def node_name(self) -> str | None:
-        # We don't want to report node name in reports from local node when
-        # using local unix socket
-        return None
-
-    def _build_url(self, path: str) -> str:
-        # The host is irrelevant for a Unix socket connection but urllib
-        # requires a non-empty host; the connection ignores it and it only
-        # ends up in the Host header. The actual endpoint is the socket path
-        # carried by the handler.
-        return f"unix://localhost{path}"
-
-    @property
-    def _auth_headers(self) -> dict[str, str]:
-        # No auth headers needed, the daemon authenticates the caller from the
-        # socket peer credentials (SO_PEERCRED)
-        return {}
-
-    def open(self, request: Request, timeout: int) -> HTTPResponse:
-        return self._opener.open(request, timeout=timeout)
 
 
 class _ApiV2Client:
@@ -238,7 +46,7 @@ class _ApiV2Client:
         self._logger = logger
 
     def task_create(
-        self, transport: _Transport, command: CommandDto, request_timeout: int
+        self, transport: Transport, command: CommandDto, request_timeout: int
     ) -> str:
         """
         Create a task using APIv2 and return its identifier
@@ -267,7 +75,7 @@ class _ApiV2Client:
 
     def task_result(
         self,
-        transport: _Transport,
+        transport: Transport,
         task_ident: str,
         request_timeout: int,
         poll_interval: float = 1.0,
@@ -338,7 +146,7 @@ class _ApiV2Client:
 
     def _send_request(
         self,
-        transport: _Transport,
+        transport: Transport,
         request: Request,
         request_timeout: int,
         request_error_on_400: bool = False,
@@ -435,7 +243,7 @@ class ApiV2NodeConnector:
     def __init__(
         self,
         logger: Logger,
-        transport: _Transport,
+        transport: Transport,
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
@@ -461,7 +269,7 @@ class ApiV2NodeConnector:
     ) -> "ApiV2NodeConnector":
         return cls(
             logger,
-            _UnixSocketTransport(unix_socket_path),
+            UnixSocketTransport(unix_socket_path),
             effective_username,
             effective_groups,
             request_timeout,
