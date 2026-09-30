@@ -1,7 +1,7 @@
 import socket
 from http.client import HTTPConnection, HTTPResponse
 from typing import Any
-from urllib.request import AbstractHTTPHandler, Request
+from urllib.request import AbstractHTTPHandler, HTTPErrorProcessor, Request
 
 
 class _UnixSocketHttpConnection(HTTPConnection):
@@ -55,3 +55,7 @@ class UnixSocketHttpHandler(AbstractHTTPHandler):
     # Reuse the HTTP request preprocessing (Host, Content-Length, ...) for the
     # custom 'unix://' scheme.
     unix_request = AbstractHTTPHandler.do_request_
+
+    # Reuse the HTTP response processing - error status codes mean that
+    # HTTPError is raised
+    unix_response = HTTPErrorProcessor.http_response
