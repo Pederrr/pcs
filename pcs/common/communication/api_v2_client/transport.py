@@ -25,16 +25,9 @@ class Transport(ABC):
 
     @property
     @abstractmethod
-    def log_label(self) -> str:
+    def host_label(self) -> str:
         """
-        Human readable endpoint identifier used in log messages.
-        """
-
-    @property
-    @abstractmethod
-    def node_name(self) -> str | None:
-        """
-        Node name for report message contexts
+        Human readable endpoint identifier.
         """
 
     def build_request(self, path: str, json_body: bytes | None) -> Request:
@@ -87,12 +80,8 @@ class TcpTransport(Transport):
         self._node_name = node_name
 
     @property
-    def log_label(self) -> str:
+    def host_label(self) -> str:
         return self._host
-
-    @property
-    def node_name(self) -> str | None:
-        return self._node_name
 
     def _build_url(self, path: str) -> str:
         return f"https://{self._host}{path}"
@@ -117,14 +106,8 @@ class UnixSocketTransport(Transport):
         self._opener = build_opener(UnixSocketHttpHandler(socket_path))
 
     @property
-    def log_label(self) -> str:
+    def host_label(self) -> str:
         return self._socket_path
-
-    @property
-    def node_name(self) -> str | None:
-        # We don't want to report node name in reports from local node when
-        # using local unix socket
-        return None
 
     def _build_url(self, path: str) -> str:
         # The host is irrelevant for a Unix socket connection but urllib
