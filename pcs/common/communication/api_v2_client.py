@@ -161,7 +161,7 @@ class _Transport(ABC):
         """
 
 
-class _HttpsTransport(_Transport):
+class _TcpTransport(_Transport):
     """
     Talk to a remote node over HTTPS using a token cookie for auth.
     """
