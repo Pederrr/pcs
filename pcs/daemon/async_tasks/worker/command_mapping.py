@@ -121,6 +121,10 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
         cmd=auth.deauth_hosts,
         required_permission=p.NONE,  # TODO
     ),
+    "auth.deauth_all_local_hosts": _Cmd(
+        cmd=auth.deauth_all_local_hosts,
+        required_permission=p.NONE,  # TODO
+    ),
     "auth.known_hosts_change": _Cmd(
         cmd=auth.known_hosts_change,
         required_permission=p.FULL,

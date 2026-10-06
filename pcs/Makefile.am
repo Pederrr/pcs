@@ -36,6 +36,7 @@ EXTRA_DIST		= \
 			  cli/cluster_property/__init__.py \
 			  cli/cluster_property/command.py \
 			  cli/cluster_property/output.py \
+			  cli/common/api_v2.py \
 			  cli/common/completion.py \
 			  cli/common/env_cli.py \
 			  cli/common/errors.py \

@@ -3,6 +3,8 @@ from collections import namedtuple
 
 from pcs import settings
 from pcs.cli.common import middleware
+from pcs.cli.common.api_v2 import ApiV2CommandProxy
+from pcs.cli.common.env_cli import Env
 from pcs.lib.commands import (
     acl,
     alert,
@@ -147,8 +149,6 @@ def load_module(env, middleware_factory, name):  # noqa: PLR0911, PLR0912
             {
                 "auth_hosts": auth.auth_hosts,
                 "auth_hosts_token_no_sync": auth.auth_hosts_token_no_sync,
-                "deauth_all_local_hosts": auth.deauth_all_local_hosts,
-                "deauth_hosts": auth.deauth_hosts,
             },
         )
 
@@ -581,9 +581,14 @@ def load_module(env, middleware_factory, name):  # noqa: PLR0911, PLR0912
 
 
 class Library:
-    def __init__(self, env, middleware_factory):
+    def __init__(self, env: Env, middleware_factory, apiv2_client):
         self.env = env
         self.middleware_factory = middleware_factory
+        self._apiv2_client = apiv2_client
 
     def __getattr__(self, name):
         return load_module(self.env, self.middleware_factory, name)
+
+    @property
+    def apiv2(self) -> ApiV2CommandProxy:
+        return ApiV2CommandProxy("", self._apiv2_client)

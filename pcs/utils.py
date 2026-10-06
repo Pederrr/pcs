@@ -37,6 +37,7 @@ from pcs.common import const, file_type_codes
 from pcs.common import file as pcs_file
 from pcs.common import pacemaker as common_pacemaker
 from pcs.common import pcs_pycurl as pycurl
+from pcs.common.communication.api_v2_client import ApiV2Connector
 from pcs.common.host import PcsKnownHost
 from pcs.common.pacemaker.resource.operations import (
     OCF_CHECK_LEVEL_INSTANCE_ATTRIBUTE_NAME,
@@ -2439,7 +2440,16 @@ def get_library_wrapper():
       * -f
     NOTE: usage of options may depend on used middleware for particular command
     """
-    return Library(get_cli_env(), get_middleware_factory())
+    cli_env = get_cli_env()
+    apiv2_client = ApiV2Connector.for_unix_socket(
+        settings.pcsd_unix_socket,
+        logging.getLogger("pcs"),
+        cli_env.user,
+        cli_env.groups,
+        cli_env.request_timeout,
+        cli_env.request_timeout,
+    )
+    return Library(cli_env, get_middleware_factory(), apiv2_client)
 
 
 def exit_on_cmdline_input_error(

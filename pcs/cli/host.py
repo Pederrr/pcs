@@ -1,9 +1,9 @@
-import logging
 from typing import Any
 from urllib.parse import urlparse
 
 from pcs import settings, utils
 from pcs.cli.common.errors import CmdLineInputError
+from pcs.cli.common.lib_wrapper import Library
 from pcs.cli.common.parse_args import (
     Argv,
     InputModifiers,
@@ -11,9 +11,7 @@ from pcs.cli.common.parse_args import (
     ensure_unique_args,
     split_list_by_any_keywords,
 )
-from pcs.cli.reports.output import error, process_library_reports
 from pcs.common.auth import HostAuthData, HostWithTokenAuthData
-from pcs.common.communication.api_v2_client import ApiV2Connector
 from pcs.common.host import Destination
 from pcs.common.str_tools import format_list
 
@@ -90,7 +88,7 @@ def auth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
     )
 
 
-def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
+def deauth_cmd(lib: Library, argv: Argv, modifiers: InputModifiers) -> None:
     """
     Options:
       * --request-timeout - timeout for HTTP requests
@@ -99,35 +97,6 @@ def deauth_cmd(lib: Any, argv: Argv, modifiers: InputModifiers) -> None:
     ensure_unique_args(argv)
 
     if not argv:
-        lib.auth.deauth_all_local_hosts()
+        lib.apiv2.auth.deauth_all_local_hosts()
     else:
-        # TODO: this is just a POC to show that the APIv2 client is usable
-        #
-        # TODO: APIv2 client/node connector will be provided from outside,
-        # not created inside the CLI command handlers
-        client = ApiV2Connector.for_unix_socket(
-            settings.pcsd_unix_socket, logging.getLogger("pcs")
-        )
-
-        # TODO: this loop and report handling will be encapsulated in some
-        # wrapper for CLI
-        #
-        # We ideally want to just call the command, and get result. Report and
-        # error handling should be ideally handled transparently.
-        try:
-            success = False
-            for result in client.run_command(
-                "auth.deauth_hosts", dict(hosts=list(argv))
-            ):
-                new_reports, success, _ = result
-                if new_reports:
-                    process_library_reports(new_reports, exit_on_error=False)
-
-            if not success:
-                # TODO: we call this without reports just to provide the default CLI error message
-                process_library_reports([], exit_on_error=True)
-        except (client.RequestError, client.CommunicationError) as e:
-            # TODO: better error messages for this?
-            raise error(str(e)) from e
-
-            # TODO: default CLI error message?
+        lib.apiv2.auth.deauth_hosts(hosts=list(argv))
