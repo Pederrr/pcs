@@ -1,7 +1,13 @@
 from typing import TYPE_CHECKING, Any
 
+from pcs import settings
 from pcs.cli.reports.output import error, process_library_reports
-from pcs.common.communication.api_v2_client import ApiV2Connector
+from pcs.common.communication.api_v2_client import (
+    ApiV2ClientError,
+    ApiV2ConnectionError,
+    ApiV2Connector,
+    ApiV2TimeoutError,
+)
 from pcs.lib.errors import LibraryError
 
 if TYPE_CHECKING:
@@ -36,17 +42,35 @@ def _run_command(
             new_reports, success, command_result = result
             if new_reports:
                 process_library_reports(new_reports, exit_on_error=False)
-    except (api_v2_client.RequestError, api_v2_client.CommunicationError) as e:
-        # TODO: better errors
-        # TODO: we might need more exception types
-        error(str(e))
+    except ApiV2ConnectionError as e:
+        # TODO
+        # original error message when pcsd was not running:
+        # unable to connect to localhost, check if pcsd is running or try
+        # setting higher timeout with --request-timeout option (<reason>)
+        error(
+            f"Unable to connect to pcsd: {str(e)}\n"
+            "Check if pcsd is running and your user is in the "
+            f"{settings.pacemaker_gname} group"
+        )
+        # TODO what if the user is root?
+        # then we write to make sure he is in haclient even tho they dont have to be
+        raise LibraryError() from e
+    except ApiV2TimeoutError as e:
+        # TODO
+        error(
+            f"Unable to connect to pcsd: {str(e)}\n"
+            "Try setting higher timeout with '--request-timeout' option"
+        )
+        raise LibraryError() from e
+    except ApiV2ClientError as e:
+        error(f"Unable to communicate with pcsd: {str(e)}")
         raise LibraryError() from e
 
     if success:
         return command_result
 
-    # Command was not successful, or some exception happened
-    # TODO: this means we have the same handling in pcs/app.py for these commands
-    # and for commands that we import and run directly.
-    # We also externally behave the same as when we imported the commands directly
+    # Command was not successful
+    # Raising LibraryError so that calling a lib command through APIv2 behaves
+    # similarly to directly importing and using the lib command - we can use the
+    # same error handling in pcs/app.py for both
     raise LibraryError()

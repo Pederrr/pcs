@@ -24,17 +24,16 @@ from pcs.common.reports import (
 )
 from pcs.lib.external import is_proxy_set
 
+from .errors import (
+    ApiV2CommunicationError,
+    ApiV2ConnectionError,
+    ApiV2ProtocolError,
+    ApiV2RequestError,
+    ApiV2TimeoutError,
+)
 from .transport import Transport, UnixSocketTransport
 
 _DTO = TypeVar("_DTO", bound=DataTransferObject)
-
-
-class ApiV2CommunicationError(Exception):
-    pass
-
-
-class ApiV2RequestError(Exception):
-    """The request payload is invalid; retrying on another node won't help."""
 
 
 class _ApiV2Client:
@@ -125,7 +124,9 @@ class _ApiV2Client:
                 dto_class.__name__,
                 e,
             )
-            raise ApiV2CommunicationError(f"Unexpected response: {e}") from e
+            raise ApiV2ProtocolError(
+                self._transport.label, detail=str(e)
+            ) from e
 
     def _send_request(
         self, request: Request, request_error_on_400: bool = False
@@ -142,7 +143,7 @@ class _ApiV2Client:
             ) as response:
                 return response.read().decode("utf-8")
         except HTTPError as e:
-            self._logger.info(
+            self._logger.error(
                 "HTTP error: %s %s for %s", e.code, e.reason, request.full_url
             )
             # HTTP 400 from task/create means the payload is inherently
@@ -152,15 +153,13 @@ class _ApiV2Client:
             #   - missing required key in CommandDto (_from_dict_exc_handled)
             #   - unexpected keys in request body (_from_dict_exc_handled)
             #   - other payload structure violations (_from_dict_exc_handled)
+            reason = str(e.reason)
+            endpoint = self._transport.label
             if request_error_on_400 and e.code == 400:
-                raise ApiV2RequestError(
-                    f"HTTP error {e.code}: {e.reason}"
-                ) from e
-            raise ApiV2CommunicationError(
-                f"HTTP error {e.code}: {e.reason}"
-            ) from e
+                raise ApiV2RequestError(endpoint, e.code, reason) from e
+            raise ApiV2CommunicationError(endpoint, e.code, reason) from e
         except URLError as e:
-            self._logger.info(
+            self._logger.error(
                 "URL error: %s for %s", e.reason, request.full_url
             )
             # Proxy env vars (https_proxy, all_proxy) are respected by
@@ -174,16 +173,38 @@ class _ApiV2Client:
                 self._logger.warning(
                     "Proxy is set in environment variables, try disabling it"
                 )
-            raise ApiV2CommunicationError(f"URL error: {e.reason}") from e
+            raise self._classify_url_error(e.reason) from e
+        except TimeoutError as e:
+            # A socket timeout may surface directly instead of wrapped in a
+            # URLError
+            self._logger.error("Timeout for %s", request.full_url)
+            raise ApiV2TimeoutError(
+                self._transport.label, self._api_v2_timeout
+            ) from e
         except Exception as e:
-            self._logger.info(
+            self._logger.error(
                 "Unexpected error %s for %s",
                 e.__class__.__name__,
                 request.full_url,
             )
             raise ApiV2CommunicationError(
-                f"Unexpected error: {e.__class__.__name__}"
+                self._transport.label,
+                reason=f"Unexpected error: {e.__class__.__name__}",
             ) from e
+
+    def _classify_url_error(self, reason: Any) -> ApiV2CommunicationError:
+        endpoint = self._transport.label
+        # socket.timeout is an alias of TimeoutError since Python 3.10
+        if isinstance(reason, TimeoutError):
+            return ApiV2TimeoutError(endpoint, self._api_v2_timeout)
+
+        # TODO specify better why this makes sense
+        # - ConnectionError is os error
+        # - Things like dns resolving errors are OsErrors as well
+        # - unable to open socket files are OSErrors as well
+        if isinstance(reason, OSError):
+            return ApiV2ConnectionError(endpoint, reason=str(reason))
+        return ApiV2CommunicationError(endpoint, reason=str(reason))
 
     def _log_poll_cycle(
         self,
@@ -217,9 +238,6 @@ class ApiV2Connector:
     APIv2 client for a specified target. Allows to run multiple commands on the
     same node under the same user.
     """
-
-    CommunicationError = ApiV2CommunicationError
-    RequestError = ApiV2RequestError
 
     def __init__(
         self,

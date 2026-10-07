@@ -143,6 +143,7 @@ EXTRA_DIST		= \
 			  common/communication/__init__.py \
 			  common/communication/api_v2_client/__init__.py \
 			  common/communication/api_v2_client/client.py \
+			  common/communication/api_v2_client/errors.py \
 			  common/communication/api_v2_client/handler.py \
 			  common/communication/api_v2_client/transport.py \
 			  common/communication/const.py \
