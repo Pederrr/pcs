@@ -189,10 +189,6 @@ post '/run_pcs' do
       'only_superuser' => false,
       'permissions' => nil,
     },
-    ['host', 'deauth', '...'] => {
-      'only_superuser' => false,
-      'permissions' => nil,
-    },
     ['pcsd', 'deauth', '...'] => {
       'only_superuser' => false,
       'permissions' => nil,

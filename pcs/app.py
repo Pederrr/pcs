@@ -59,7 +59,6 @@ def _non_root_run(argv_cmd):  # noqa: PLR0912
         ["cluster", "sync", "..."],
         # ['config', 'restore', '...'], # handled in config.config_restore
         ["host", "auth", "..."],
-        ["host", "deauth", "..."],
         ["pcsd", "deauth", "..."],
         ["pcsd", "status", "..."],
         ["quorum", "device", "status", "..."],
