@@ -1,7 +1,10 @@
 import logging
 from collections import namedtuple
 
-from pcs import settings
+from pcs import (
+    settings,
+    utils,  # TODO
+)
 from pcs.cli.common import middleware
 from pcs.cli.common.api_v2 import ApiV2CommandProxy
 from pcs.cli.common.env_cli import Env
@@ -591,4 +594,7 @@ class Library:
 
     @property
     def apiv2(self) -> ApiV2CommandProxy:
-        return ApiV2CommandProxy("", self._apiv2_client)
+        # TODO: properly get report_processor from outside
+        return ApiV2CommandProxy(
+            "", self._apiv2_client, utils.get_report_processor()
+        )
