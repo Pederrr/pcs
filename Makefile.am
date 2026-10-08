@@ -10,6 +10,7 @@ EXTRA_DIST		= \
 			  mypy.ini \
 			  pcs.pc.in \
 			  rpm/pcs.spec.in \
+			  scripts/gen_apiv2_stubs.py \
 			  scripts/pcsd.sh.in \
 			  .version
 
@@ -293,6 +294,19 @@ if DEV_TESTS
 		$(TIME) $(PYTHON) -m mypy --config-file mypy.ini --package pcs --package pcs_test
 endif
 
+PCS_APIV2_STUB=${abs_top_srcdir}/pcs/cli/common/api_v2.pyi
+GEN_APIV2_STUBS=export \
+		PYTHONPATH=${abs_top_builddir}/${PCS_BUNDLED_DIR_LOCAL}/packages:${abs_top_builddir} && \
+	$(PYTHON) ${abs_top_srcdir}/scripts/gen_apiv2_stubs.py
+
+.PHONY: gen-apiv2-stubs
+# The package must be importable to introspect COMMAND_MAP, so the build
+# dependencies have to be in place first.
+gen-apiv2-stubs: check-local-deps
+if DEV_TESTS
+	$(GEN_APIV2_STUBS) $(PCS_APIV2_STUB)
+endif
+
 RUN_TYPOS=typos --color never --format brief | sed -e 's/:[0-9]\+:[0-9]\+:/:/' | $(SORT)
 .PHONY: typos_check
 typos_check:
@@ -330,7 +344,7 @@ else
 check-local-deps:
 endif
 
-all: check-local-deps
+all: check-local-deps gen-apiv2-stubs
 
 test-tree-prep:
 	if [ "${abs_top_builddir}" != "${abs_top_srcdir}" ]; then \

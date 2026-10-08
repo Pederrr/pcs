@@ -53,6 +53,9 @@ pcs = ["py.typed"]
 # ruff settings docs: https://docs.astral.sh/ruff/settings/
 line-length = 80
 target-version = "py312"
+# Type stubs are generated (see scripts/gen_apiv2_stubs.py); their formatting is
+# determined by the generator, not by ruff.
+extend-exclude = ["*.pyi"]
 
 [tool.ruff.lint]
 # ruff rules docs: https://docs.astral.sh/ruff/rules/

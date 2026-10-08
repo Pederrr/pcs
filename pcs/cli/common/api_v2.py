@@ -14,7 +14,10 @@ if TYPE_CHECKING:
     from pcs.common import reports
 
 
-# TODO: type stubs generated from COMMAND_MAPPING
+# The static type of this dynamic proxy is described by the generated stub
+# api_v2.pyi (see scripts/gen_apiv2_stubs.py, `make gen-apiv2-stubs`), which maps
+# COMMAND_MAP onto typed nested namespaces. Keep the two in sync - `make check`
+# fails if the committed stub is stale.
 class ApiV2CommandProxy:
     def __init__(self, name: str, api_client: ApiV2Connector):
         self._name = name
