@@ -595,6 +595,4 @@ class Library:
 
     @property
     def apiv2(self) -> ApiV2CommandProxy:
-        return ApiV2CommandProxy(
-            "", self._apiv2_client, self.env.report_processor
-        )
+        return ApiV2CommandProxy(self._apiv2_client, self.env.report_processor)
