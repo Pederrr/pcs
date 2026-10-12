@@ -1,4 +1,5 @@
 class Env:
+    # TODO: should rather be params - maybe dataclass ???
     def __init__(self):
         self.cib_data = None
         self.user = None

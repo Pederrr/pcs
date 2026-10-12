@@ -1,13 +1,12 @@
 import logging
 from collections import namedtuple
+from typing import Any
 
-from pcs import (
-    settings,
-    utils,  # TODO
-)
+from pcs import settings
 from pcs.cli.common import middleware
 from pcs.cli.common.api_v2 import ApiV2CommandProxy
 from pcs.cli.common.env_cli import Env
+from pcs.common.communication.api_v2_client import ApiV2Connector
 from pcs.lib.commands import (
     acl,
     alert,
@@ -584,17 +583,18 @@ def load_module(env, middleware_factory, name):  # noqa: PLR0911, PLR0912
 
 
 class Library:
-    def __init__(self, env: Env, middleware_factory, apiv2_client):
+    def __init__(
+        self, env: Env, middleware_factory: Any, apiv2_client: ApiV2Connector
+    ):
         self.env = env
         self.middleware_factory = middleware_factory
         self._apiv2_client = apiv2_client
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return load_module(self.env, self.middleware_factory, name)
 
     @property
     def apiv2(self) -> ApiV2CommandProxy:
-        # TODO: properly get report_processor from outside
         return ApiV2CommandProxy(
-            "", self._apiv2_client, utils.get_report_processor()
+            "", self._apiv2_client, self.env.report_processor
         )

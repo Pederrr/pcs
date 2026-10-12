@@ -2393,7 +2393,7 @@ def get_cib_user_groups():
     return user, groups
 
 
-def get_cli_env():
+def get_cli_env() -> Env:
     """
     Commandline options:
       * --debug
@@ -2428,7 +2428,7 @@ def get_middleware_factory():
     )
 
 
-def get_library_wrapper():
+def get_library_wrapper() -> Library:
     """
     Commandline options:
       * --debug
@@ -2443,7 +2443,7 @@ def get_library_wrapper():
     cli_env = get_cli_env()
     apiv2_client = ApiV2Connector.for_unix_socket(
         settings.pcsd_unix_socket,
-        logging.getLogger("pcs"),
+        logging.getLogger("pcs"),  # TODO
         cli_env.user,
         cli_env.groups,
         cli_env.request_timeout,

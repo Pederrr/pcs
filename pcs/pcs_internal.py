@@ -79,7 +79,8 @@ def main() -> None:
             json.load(sys.stdin),
         )
         cli_env = get_cli_env(input_dto.options)
-        lib = Library(cli_env, utils.get_middleware_factory(), None)  # TODO:
+        # TODO
+        lib = Library(cli_env, utils.get_middleware_factory(), None)  # type: ignore
         if input_dto.cmd not in SUPPORTED_COMMANDS:
             _exit(
                 communication.const.COM_STATUS_UNKNOWN_CMD,

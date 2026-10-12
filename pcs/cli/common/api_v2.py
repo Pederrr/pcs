@@ -14,9 +14,12 @@ from pcs.lib.errors import LibraryError
 
 # The static type of this dynamic proxy is described by the generated stub
 # api_v2.pyi (see scripts/gen_apiv2_stubs.py, `make gen-apiv2-stubs`), which maps
-# COMMAND_MAP onto typed nested namespaces. Keep the two in sync - `make check`
-# fails if the committed stub is stale.
+# COMMAND_MAP onto typed nested namespaces.
 class ApiV2CommandProxy:
+    """
+    TODO
+    """
+
     def __init__(
         self,
         command_name: str,
