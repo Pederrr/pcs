@@ -804,6 +804,46 @@ class NodeCommunicationRetrying(NameBuildTest):
         )
 
 
+class PcsdConnectionError(NameBuildTest):
+    def test_success(self):
+        self.assert_message_from_report(
+            "Unable to connect to pcsd (connection refused)",
+            reports.PcsdConnectionError("connection refused"),
+        )
+
+    def test_no_reason(self):
+        self.assert_message_from_report(
+            "Unable to connect to pcsd", reports.PcsdConnectionError()
+        )
+
+
+class PcsdCommunicationTimeout(NameBuildTest):
+    def test_success(self):
+        self.assert_message_from_report(
+            "Communication with pcsd timed out after 60 seconds",
+            reports.PcsdCommunicationTimeout(60),
+        )
+
+    def test_no_timeout(self):
+        self.assert_message_from_report(
+            "Communication with pcsd timed out",
+            reports.PcsdCommunicationTimeout(),
+        )
+
+
+class PcsdCommunicationError(NameBuildTest):
+    def test_success(self):
+        self.assert_message_from_report(
+            "Unable to communicate with pcsd (HTTP error 500: oops)",
+            reports.PcsdCommunicationError("HTTP error 500: oops"),
+        )
+
+    def test_no_reason(self):
+        self.assert_message_from_report(
+            "Unable to communicate with pcsd", reports.PcsdCommunicationError()
+        )
+
+
 class DefaultsCanBeOverridden(NameBuildTest):
     def test_message(self):
         self.assert_message_from_report(

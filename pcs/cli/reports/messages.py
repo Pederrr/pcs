@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Any, get_type_hints
 
+from pcs import settings
 from pcs.common import file_type_codes
 from pcs.common.reports import codes, const, dto, item, messages, types
 from pcs.common.str_tools import (
@@ -112,6 +113,29 @@ class NodeCommunicationErrorNotAuthorized(CliReportMessageCustom):
         return (
             f"Unable to authenticate to {self._obj.node} ({self._obj.reason})"
             f", try running 'pcs host auth {self._obj.node}'"
+        )
+
+
+class PcsdConnectionError(CliReportMessageCustom):
+    _obj: messages.PcsdConnectionError
+
+    @property
+    def message(self) -> str:
+        return (
+            f"{self._obj.message}\n"
+            "Check if pcsd is running and your user is a member of the "
+            f"'{settings.pacemaker_gname}' group"
+        )
+
+
+class PcsdCommunicationTimeout(CliReportMessageCustom):
+    _obj: messages.PcsdCommunicationTimeout
+
+    @property
+    def message(self) -> str:
+        return (
+            f"{self._obj.message}, try setting a higher timeout with the "
+            "'--request-timeout' option"
         )
 
 

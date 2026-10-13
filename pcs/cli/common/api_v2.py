@@ -46,42 +46,28 @@ class ApiV2CommandProxy:
                 new_reports, success, command_result = result
                 self._report_processor.report_list(new_reports)
         except ApiV2ConnectionError as e:
-            # original error message when pcsd was not running:
-            # unable to connect to localhost, check if pcsd is running or try
-            # setting higher timeout with --request-timeout option (<reason>)
-            """
-            error(
-                f"Unable to connect to pcsd: {str(e)}\n"
-                "Check if pcsd is running and your user is in the "
-                f"{settings.pacemaker_gname} group"
+            self._report_processor.report(
+                reports.ReportItem.error(
+                    reports.messages.PcsdConnectionError(e.reason or "")
+                )
             )
-            """
-            # TODO what if the user is root?
-            # then we write to make sure he is in haclient even tho they dont have to be
-
-            # self._report_processor.report(TODO)
             raise LibraryError() from e
         except ApiV2TimeoutError as e:
-            """
-            error(
-                f"Unable to connect to pcsd: {str(e)}\n"
-                "Try setting higher timeout with '--request-timeout' option"
+            self._report_processor.report(
+                reports.ReportItem.error(
+                    reports.messages.PcsdCommunicationTimeout(e.timeout)
+                )
             )
-            """
-            # self._report_processor.report(TODO)
             raise LibraryError() from e
         except ApiV2ClientError as e:
-            """
-            error(f"Unable to communicate with pcsd: {str(e)}")
-            """
-            # self._report_processor.report(TODO)
+            self._report_processor.report(
+                reports.ReportItem.error(
+                    reports.messages.PcsdCommunicationError(str(e))
+                )
+            )
             raise LibraryError() from e
 
         if success:
             return command_result
 
-        # Command was not successful
-        # Raising LibraryError so that calling a lib command through APIv2 behaves
-        # similarly to directly importing and using the lib command - we can use the
-        # same error handling in pcs/app.py for both
         raise LibraryError()

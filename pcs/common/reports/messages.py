@@ -1300,6 +1300,60 @@ class NodeCommunicationRetrying(ReportItemMessage):
 
 
 @dataclass(frozen=True)
+class PcsdConnectionError(ReportItemMessage):
+    """
+    Unable to establish a connection to pcsd (e.g. the daemon is not running).
+
+    reason -- plain-text description of the error
+    """
+
+    reason: str = ""
+    _code = codes.PCSD_CONNECTION_ERROR
+
+    @property
+    def message(self) -> str:
+        return "Unable to connect to pcsd{reason}".format(
+            reason=format_optional(self.reason, " ({})"),
+        )
+
+
+@dataclass(frozen=True)
+class PcsdCommunicationTimeout(ReportItemMessage):
+    """
+    Communication with pcsd timed out.
+
+    timeout -- the timeout in seconds after which the request was aborted
+    """
+
+    timeout: float | None = None
+    _code = codes.PCSD_COMMUNICATION_TIMEOUT
+
+    @property
+    def message(self) -> str:
+        return "Communication with pcsd timed out{timeout}".format(
+            timeout=format_optional(self.timeout, " after {} seconds"),
+        )
+
+
+@dataclass(frozen=True)
+class PcsdCommunicationError(ReportItemMessage):
+    """
+    Communication with pcsd failed for another reason.
+
+    reason -- plain-text description of the error
+    """
+
+    reason: str = ""
+    _code = codes.PCSD_COMMUNICATION_ERROR
+
+    @property
+    def message(self) -> str:
+        return "Unable to communicate with pcsd{reason}".format(
+            reason=format_optional(self.reason, " ({})"),
+        )
+
+
+@dataclass(frozen=True)
 class DefaultsCanBeOverridden(ReportItemMessage):
     """
     Warning when settings defaults (op_defaults, rsc_defaults...)

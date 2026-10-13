@@ -93,6 +93,29 @@ class ResourceUnmoveUnbanPcmkExpiredNotSupported(CliReportMessageTestBase):
         )
 
 
+class PcsdConnectionError(CliReportMessageTestBase):
+    def test_message(self):
+        self.assert_message(
+            messages.PcsdConnectionError("connection refused"),
+            (
+                "Unable to connect to pcsd (connection refused)\n"
+                "Check if pcsd is running and your user is a member of the "
+                "'haclient' group"
+            ),
+        )
+
+
+class PcsdCommunicationTimeout(CliReportMessageTestBase):
+    def test_message(self):
+        self.assert_message(
+            messages.PcsdCommunicationTimeout(60),
+            (
+                "Communication with pcsd timed out after 60 seconds, try "
+                "setting a higher timeout with the '--request-timeout' option"
+            ),
+        )
+
+
 class CannotUnmoveUnbanResourceMasterResourceNotPromotable(
     CliReportMessageTestBase
 ):
