@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from pcs.common.host import PcsKnownHost
 from pcs.common.reports import ReportProcessor
@@ -15,7 +16,7 @@ class Env:
     debug: bool = False
     request_timeout: int | None = None
     # TODO: types
-    cib_data = None
-    corosync_conf_data = None
-    booth = None
-    pacemaker = None
+    cib_data: Any = None
+    corosync_conf_data: Any = None
+    booth: Any = None
+    pacemaker: Any = None

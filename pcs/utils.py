@@ -2404,7 +2404,7 @@ def get_cli_env() -> Env:
         report_processor=get_report_processor(),
         user=user,
         groups=groups,
-        request_timeout=pcs_options.get("--request_timeout"),
+        request_timeout=pcs_options.get("--request-timeout"),
         known_hosts_getter=read_known_hosts_file,
     )
 
