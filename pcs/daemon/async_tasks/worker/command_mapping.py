@@ -119,11 +119,11 @@ COMMAND_MAP: Mapping[str, _Cmd] = {
     ),
     "auth.deauth_hosts": _Cmd(
         cmd=auth.deauth_hosts,
-        required_permission=p.NONE,  # TODO
+        required_permission=p.NONE,
     ),
     "auth.deauth_all_local_hosts": _Cmd(
         cmd=auth.deauth_all_local_hosts,
-        required_permission=p.NONE,  # TODO
+        required_permission=p.NONE,
     ),
     "auth.known_hosts_change": _Cmd(
         cmd=auth.known_hosts_change,

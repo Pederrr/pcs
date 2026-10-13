@@ -2449,7 +2449,7 @@ def get_library_wrapper() -> Library:
         cli_env.user,
         cli_env.groups,
         cli_env.request_timeout,
-        cli_env.request_timeout,  # TODO
+        cli_env.request_timeout or settings.default_request_timeout,
     )
     return Library(cli_env, get_middleware_factory(), apiv2_client)
 
