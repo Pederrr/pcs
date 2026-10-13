@@ -79,8 +79,17 @@ def main() -> None:
             json.load(sys.stdin),
         )
         cli_env = get_cli_env(input_dto.options)
-        # TODO
-        lib = Library(cli_env, utils.get_middleware_factory(), None)  # type: ignore
+
+        # The apiv2_client is only used by Library.apiv2, which proxies commands
+        # over the network to a remote pcsd. pcs_internal only runs local
+        # library commands (see SUPPORTED_COMMANDS), so the apiv2 proxy is never
+        # reached here. Constructing an ApiV2Connector would be unnecessary, and
+        # passing None here is safe and intentional.
+        lib = Library(
+            cli_env,
+            utils.get_middleware_factory(),
+            None,  # type: ignore[arg-type]
+        )
         if input_dto.cmd not in SUPPORTED_COMMANDS:
             _exit(
                 communication.const.COM_STATUS_UNKNOWN_CMD,
@@ -88,7 +97,7 @@ def main() -> None:
             )
         for sub_cmd in input_dto.cmd.split("."):
             lib = getattr(lib, sub_cmd)
-        output_data = lib(**input_dto.cmd_data)  # type: ignore
+        output_data = lib(**input_dto.cmd_data)  # type: ignore[operator]
         _exit(
             communication.const.COM_STATUS_SUCCESS,
             report_list=cli_env.report_processor.processed_items,

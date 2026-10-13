@@ -15,7 +15,16 @@ from pcs.lib.errors import LibraryError
 # COMMAND_MAP onto typed nested namespaces.
 class ApiV2CommandProxy:
     """
-    TODO
+    Dynamic proxy that exposes APIv2 commands as attribute access.
+
+    Attribute access builds up a dotted command name (e.g.
+    ``proxy.services.get_services_info`` yields a proxy with command name
+    ``services.get_services_info``) without triggering any communication.
+    Calling the resulting proxy runs that command via the ApiV2Connector,
+    forwards any reports produced by the command to the report processor, and
+    returns the command result. Any APIv2 client error is reported and
+    re-raised as a LibraryError, so callers can handle failures the same way as
+    with the local library commands.
     """
 
     def __init__(

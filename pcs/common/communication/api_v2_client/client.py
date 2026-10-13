@@ -198,10 +198,17 @@ class _ApiV2Client:
         if isinstance(reason, TimeoutError):
             return ApiV2TimeoutError(endpoint, self._api_v2_timeout)
 
-        # TODO specify better why this makes sense
-        # - ConnectionError is os error
-        # - Things like dns resolving errors are OsErrors as well
-        # - unable to open socket files are OSErrors as well
+        # URLError.reason wraps the underlying cause of the failure. When that
+        # cause is an OSError, the request never got a usable response because
+        # we could not establish the connection in the first place, so we treat
+        # it as a connection error. This covers all the low-level failures we
+        # care about, because they all subclass OSError:
+        # - ConnectionError (e.g. connection refused/reset) is an OSError
+        # - DNS resolution failures (socket.gaierror) are OSErrors
+        # - SSL failures - ssl.SSLError
+        # - failures to open the unix socket file are OSErrors
+        # Anything else is a reason we don't specifically recognize, so we fall
+        # back to a generic communication error.
         if isinstance(reason, OSError):
             return ApiV2ConnectionError(endpoint, reason=str(reason))
         return ApiV2CommunicationError(endpoint, reason=str(reason))
