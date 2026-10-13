@@ -240,7 +240,6 @@ def generate_stub(command_map: typing.Any, proxy_class: type) -> str:
 
 
 def main() -> None:
-
     output_path = sys.argv[1] if len(sys.argv) > 1 else _DEFAULT_OUTPUT
     stub = generate_stub(COMMAND_MAP, ApiV2CommandProxy)
     with open(output_path, "w", encoding="utf-8") as stub_file:

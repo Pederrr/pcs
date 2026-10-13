@@ -40,10 +40,11 @@ class _ApiV2Client:
     def __init__(
         self,
         transport: Transport,
-        logger: Logger,
+        logger: Logger,  # TODO: iterable of report processors instead
         context_node_name: str | None = None,
         api_v2_timeout: float = settings.default_request_timeout,
     ):
+        # We should use reports instead
         self._logger = logger
         self._transport = transport
         self._api_v2_timeout = api_v2_timeout
