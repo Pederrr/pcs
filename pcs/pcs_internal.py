@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from typing import Any
+from typing import Any, cast
 
 from dacite import DaciteError
 
@@ -41,18 +41,19 @@ def _exit(
 def get_cli_env(
     options: communication.dto.InternalCommunicationRequestOptionsDto,
 ) -> Env:
-    env = Env()
-    env.user, env.groups = utils.get_cib_user_groups()
-    env.known_hosts_getter = utils.read_known_hosts_file
-    # Debug messages always go to the processor. The parameter only affects if
-    # they will be printed to stdout. We are not printing the messages. Instead
-    # we get all the messages the processor got. So the value of the parameter
-    # does not matter.
-    env.report_processor = LibraryReportProcessor()
-    env.request_timeout = (
-        options.request_timeout or settings.default_request_timeout
+    user, groups = utils.get_cib_user_groups()
+    return Env(
+        user=user,
+        groups=groups,
+        # Debug messages always go to the processor. The parameter only affects if
+        # they will be printed to stdout. We are not printing the messages. Instead
+        # we get all the messages the processor got. So the value of the parameter
+        # does not matter.
+        report_processor=LibraryReportProcessor(),
+        known_hosts_getter=utils.read_known_hosts_file,
+        request_timeout=options.request_timeout
+        or settings.default_request_timeout,
     )
-    return env
 
 
 class LibraryReportProcessor(ReportProcessor):
@@ -79,6 +80,9 @@ def main() -> None:
             json.load(sys.stdin),
         )
         cli_env = get_cli_env(input_dto.options)
+        report_processor = cast(
+            LibraryReportProcessor, cli_env.report_processor
+        )
 
         # The apiv2_client is only used by Library.apiv2, which proxies commands
         # over the network to a remote pcsd. pcs_internal only runs local
@@ -100,7 +104,7 @@ def main() -> None:
         output_data = lib(**input_dto.cmd_data)  # type: ignore[operator]
         _exit(
             communication.const.COM_STATUS_SUCCESS,
-            report_list=cli_env.report_processor.processed_items,
+            report_list=report_processor.processed_items,
             data=(
                 dto.to_dict(output_data)
                 if isinstance(output_data, dto.DataTransferObject)
@@ -110,9 +114,7 @@ def main() -> None:
     except LibraryError as e:
         _exit(
             communication.const.COM_STATUS_ERROR,
-            report_list=(
-                cli_env.report_processor.processed_items + list(e.args)
-            ),
+            report_list=report_processor.processed_items + list(e.args),
         )
     except json.JSONDecodeError as e:
         _exit(

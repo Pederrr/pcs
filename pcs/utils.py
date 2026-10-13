@@ -2376,7 +2376,7 @@ def get_lib_env() -> LibraryEnvironment:
     )
 
 
-def get_cib_user_groups():
+def get_cib_user_groups() -> tuple[str | None, list[str] | None]:
     """
     Commandline options: no options
     """
@@ -2399,12 +2399,14 @@ def get_cli_env() -> Env:
       * --debug
       * --request-timeout
     """
-    env = Env()
-    env.user, env.groups = get_cib_user_groups()
-    env.known_hosts_getter = read_known_hosts_file
-    env.report_processor = get_report_processor()
-    env.request_timeout = pcs_options.get("--request-timeout")
-    return env
+    user, groups = get_cib_user_groups()
+    return Env(
+        report_processor=get_report_processor(),
+        user=user,
+        groups=groups,
+        request_timeout=pcs_options.get("--request_timeout"),
+        known_hosts_getter=read_known_hosts_file,
+    )
 
 
 def get_middleware_factory():
