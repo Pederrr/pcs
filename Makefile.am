@@ -49,8 +49,6 @@ ACLOCAL_AMFLAGS		= -I m4
 
 SUBDIRS			= pcs pcsd pcs_test data
 
-PCS_PYTHON_PACKAGES = pcs/ pcs_test/
-
 # options for any pip command
 pipopts	= --disable-pip-version-check --verbose
 # options for pip install
@@ -264,34 +262,34 @@ endif
 
 ruff_format_check: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml format --check ${PCS_PYTHON_PACKAGES}
+	$(TIME) ruff --config pyproject.toml format --check pcs/ pcs_test/ scripts/
 endif
 
 ruff_format: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check --select I --fix ${PCS_PYTHON_PACKAGES}
-	$(TIME) ruff --config pyproject.toml format ${PCS_PYTHON_PACKAGES}
+	$(TIME) ruff --config pyproject.toml check --select I --fix pcs/ pcs_test/ scripts/
+	$(TIME) ruff --config pyproject.toml format pcs/ pcs_test/ scripts/
 endif
 
 ruff_isort_check: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check --select I ${PCS_PYTHON_PACKAGES}
+	$(TIME) ruff --config pyproject.toml check --select I pcs/ pcs_test/ scripts/
 endif
 
 ruff_isort: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check --select I --fix ${PCS_PYTHON_PACKAGES}
+	$(TIME) ruff --config pyproject.toml check --select I --fix pcs/ pcs_test/ scripts/
 endif
 
 ruff_lint: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check ${PCS_PYTHON_PACKAGES}
+	$(TIME) ruff --config pyproject.toml check pcs/ pcs_test/ scripts/
 endif
 
-mypy:
+mypy: gen-apiv2-stubs
 if DEV_TESTS
 	export PYTHONPATH=${abs_top_builddir}/${PCS_BUNDLED_DIR_LOCAL}/packages && \
-		$(TIME) $(PYTHON) -m mypy --config-file mypy.ini --package pcs --package pcs_test
+		$(TIME) $(PYTHON) -m mypy --config-file mypy.ini --package pcs --package pcs_test --package scripts
 endif
 
 PCS_APIV2_STUB=${abs_top_srcdir}/pcs/cli/common/api_v2.pyi

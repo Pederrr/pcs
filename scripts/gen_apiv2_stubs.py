@@ -10,13 +10,8 @@ e.g. `lib.apiv2.resource.create(...)` is type-checked against the real lib
 command signature (minus the leading `env` parameter, which the daemon
 supplies).
 
-Usage:
-    PYTHONPATH=<built-tree> python3 scripts/gen_apiv2_stubs.py [OUTPUT.pyi]
-
 The package must be importable, which requires a configured tree (pcs/settings.py
-generated from settings.py.in). With no argument the stub is written next to the
-module it describes. Output is deterministic so it can be committed and checked
-for staleness in CI.
+generated from settings.py.in).
 """
 
 import inspect
@@ -24,6 +19,9 @@ import os
 import sys
 import types
 import typing
+
+from pcs.cli.common.api_v2 import ApiV2CommandProxy
+from pcs.daemon.async_tasks.worker.command_mapping import COMMAND_MAP
 
 # Make the stub independent of where the script lives relative to the package.
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +45,7 @@ def _render_origin(origin: typing.Any, imports: set[str]) -> str:
     return "typing.Any"
 
 
-def _render_type(annotation: typing.Any, imports: set[str]) -> str:
+def _render_type(annotation: typing.Any, imports: set[str]) -> str:  # noqa: PLR0911
     """Render a resolved annotation object to a fully-qualified type string."""
     if annotation is None or annotation is type(None):
         return "None"
@@ -242,8 +240,6 @@ def generate_stub(command_map: typing.Any, proxy_class: type) -> str:
 
 
 def main() -> None:
-    from pcs.cli.common.api_v2 import ApiV2CommandProxy
-    from pcs.daemon.async_tasks.worker.command_mapping import COMMAND_MAP
 
     output_path = sys.argv[1] if len(sys.argv) > 1 else _DEFAULT_OUTPUT
     stub = generate_stub(COMMAND_MAP, ApiV2CommandProxy)

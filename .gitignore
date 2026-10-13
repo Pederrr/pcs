@@ -1,5 +1,6 @@
 *.pyc
 *.swp
+*.pyi
 pcs.spec
 /MANIFEST
 /dist/
@@ -27,8 +28,6 @@ pcs_test/api_v2_client
 pcs/pcs
 pcs/pcs_internal
 pcs/settings.py
-# generated at build time by scripts/gen_apiv2_stubs.py
-pcs/cli/common/api_v2.pyi
 pcs_test/pcs_for_tests
 pcs_test/settings.py
 pcs_test/suite
