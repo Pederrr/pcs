@@ -339,8 +339,8 @@ class ApiV2Connector:
 
         unix_socket_path -- file path of the unix socket
         reporters -- report processors to report communication diagnostics to
-        effective_username --
-        effective_groups --
+        effective_username -- name of effective user for the APIv2 tasks
+        effective_groups -- groups of effective user for the APIv2 tasks
         request_timeout -- timeout for the requests done inside created APIv2
             tasks
         api_v2_timeout -- timeout for requests done to APIv2 endpoints

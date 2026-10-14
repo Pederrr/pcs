@@ -593,6 +593,10 @@ class Library:
     def __getattr__(self, name: str) -> Any:
         return load_module(self.env, self.middleware_factory, name)
 
+    # TODO: properly think this through while rewiring commands that need to
+    # import the lib commands and call them that way:
+    # - Do we really want to let CLI command handlers if they want to use apiv2/import
+    # - Permissions -> Do we want to allow to call any apiv2 command from CLI
     @property
     def apiv2(self) -> ApiV2CommandProxy:
         return ApiV2CommandProxy(self._apiv2_client, self.env.report_processor)
