@@ -6,7 +6,7 @@ from pcs.cli.common.lib_wrapper import Library
 class LibraryWrapperTest(TestCase):
     def test_raises_for_bad_path(self):
         mock_middleware_factory = mock.MagicMock()
-        lib = Library("env", mock_middleware_factory)
+        lib = Library("env", mock_middleware_factory, mock.MagicMock())
         self.assertRaises(ValueError, lambda: lib.no_valid_library_part)
 
     @mock.patch("pcs.cli.common.lib_wrapper.constraint_order.create_with_set")
@@ -25,7 +25,7 @@ class LibraryWrapperTest(TestCase):
         mock_middleware_factory.corosync_conf_existing = dummy_middleware
         mock_env = mock.MagicMock()
         Library(
-            mock_env, mock_middleware_factory
+            mock_env, mock_middleware_factory, mock.MagicMock()
         ).constraint_order.create_with_set("first", second="third")
 
         mock_order_set.assert_called_once_with(lib_env, "first", second="third")
