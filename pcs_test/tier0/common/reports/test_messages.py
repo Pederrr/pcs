@@ -3069,6 +3069,28 @@ class AgentGenericError(NameBuildTest):
         )
 
 
+class ApiV2TaskCreated(NameBuildTest):
+    def test_all(self):
+        self.assert_message_from_report(
+            "Created task 'task-id' on /var/run/pcsd.socket",
+            reports.ApiV2TaskCreated("task-id", "/var/run/pcsd.socket"),
+        )
+
+
+class ApiV2TaskStatus(NameBuildTest):
+    def test_without_detail(self):
+        self.assert_message_from_report(
+            "Task 'task-id' status: unfinished",
+            reports.ApiV2TaskStatus("task-id", "unfinished"),
+        )
+
+    def test_with_detail(self):
+        self.assert_message_from_report(
+            "Task 'task-id' status: success (result data)",
+            reports.ApiV2TaskStatus("task-id", "success", "result data"),
+        )
+
+
 class OmittingNode(NameBuildTest):
     def test_all(self):
         self.assert_message_from_report(

@@ -2445,7 +2445,7 @@ def get_library_wrapper() -> Library:
     cli_env = get_cli_env()
     apiv2_client = ApiV2Connector.for_unix_socket(
         settings.pcsd_unix_socket,
-        logging.getLogger("pcs"),  # TODO
+        [cli_env.report_processor],
         cli_env.user,
         cli_env.groups,
         cli_env.request_timeout,

@@ -1,8 +1,7 @@
 import json
 import os
 import time
-from collections.abc import Iterator, Mapping
-from logging import Logger
+from collections.abc import Iterable, Iterator, Mapping
 from typing import Any, TypeVar
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
@@ -17,9 +16,11 @@ from pcs.common.async_tasks.dto import (
 from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.interface.dto import DataTransferObject, from_dict, to_dict
 from pcs.common.reports import (
+    ReportItem,
     ReportItemContext,
-    ReportItemDto,
     ReportItemList,
+    ReportProcessor,
+    messages,
     report_dto_to_item,
 )
 from pcs.lib.external import is_proxy_set
@@ -36,16 +37,23 @@ from .transport import Transport, UnixSocketTransport
 _DTO = TypeVar("_DTO", bound=DataTransferObject)
 
 
+def _request_data(request: Request) -> str:
+    if request.data is None:
+        return ""
+    if isinstance(request.data, bytes):
+        return request.data.decode("utf-8", errors="replace")
+    return str(request.data)
+
+
 class _ApiV2Client:
     def __init__(
         self,
         transport: Transport,
-        logger: Logger,  # TODO: iterable of report processors instead
+        reporters: Iterable[ReportProcessor],
         context_node_name: str | None = None,
         api_v2_timeout: float = settings.default_request_timeout,
     ):
-        # We should use reports instead
-        self._logger = logger
+        self._reporters = list(reporters)
         self._transport = transport
         self._api_v2_timeout = api_v2_timeout
         self._report_item_context = (
@@ -53,6 +61,10 @@ class _ApiV2Client:
             if context_node_name is None
             else ReportItemContext(context_node_name)
         )
+
+    def _report(self, report_item: ReportItem) -> None:
+        for reporter in self._reporters:
+            reporter.report(report_item)
 
     def task_create(self, command: CommandDto) -> str:
         """
@@ -66,8 +78,10 @@ class _ApiV2Client:
         )
         response = self._send_request(request, request_error_on_400=True)
         task_ident = self._parse_response(response, TaskIdentDto).task_ident
-        self._logger.info(
-            "Created task %s on %s", task_ident, self._transport.label
+        self._report(
+            ReportItem.debug(
+                messages.ApiV2TaskCreated(task_ident, self._transport.label)
+            )
         )
         return task_ident
 
@@ -96,7 +110,7 @@ class _ApiV2Client:
             new_reports_dto = result_dto.reports[reports_seen:]
             reports_seen = len(result_dto.reports)
 
-            self._log_poll_cycle(task_ident, result_dto, new_reports_dto)
+            self._report_poll_cycle(task_ident, result_dto)
 
             new_reports = [
                 report_dto_to_item(r, self._report_item_context)
@@ -119,11 +133,13 @@ class _ApiV2Client:
         try:
             return from_dict(dto_class, json.loads(response))
         except Exception as e:
-            self._logger.error(
-                "Response from %s does not conform to %s %s",
-                self._transport.label,
-                dto_class.__name__,
-                e,
+            self._report(
+                ReportItem.debug(
+                    messages.NodeCommunicationDebugInfo(
+                        self._transport.label,
+                        f"Response does not conform to {dto_class.__name__}: {e}",
+                    )
+                )
             )
             raise ApiV2ProtocolError(
                 self._transport.label, detail=str(e)
@@ -133,7 +149,13 @@ class _ApiV2Client:
         self, request: Request, request_error_on_400: bool = False
     ) -> str:
         try:
-            self._logger.info("Sending request to %s", request.full_url)
+            self._report(
+                ReportItem.debug(
+                    messages.NodeCommunicationStarted(
+                        request.full_url, _request_data(request)
+                    )
+                )
+            )
             # Timeout applies to each individual HTTP request, not to the
             # overall operation. Both task/create and task/result are
             # lightweight server-side operations that should respond quickly.
@@ -142,10 +164,24 @@ class _ApiV2Client:
             with self._transport.open(
                 request, self._api_v2_timeout
             ) as response:
-                return response.read().decode("utf-8")
+                body = response.read().decode("utf-8")
+                self._report(
+                    ReportItem.debug(
+                        messages.NodeCommunicationFinished(
+                            request.full_url, response.status, body
+                        )
+                    )
+                )
+                return body
         except HTTPError as e:
-            self._logger.error(
-                "HTTP error: %s %s for %s", e.code, e.reason, request.full_url
+            self._report(
+                ReportItem.debug(
+                    messages.NodeCommunicationError(
+                        self._transport.label,
+                        request.full_url,
+                        f"HTTP error: {e.code} {e.reason}",
+                    )
+                )
             )
             # HTTP 400 from task/create means the payload is inherently
             # invalid — no node can process it. All 400 cases (api_v2.py):
@@ -160,9 +196,6 @@ class _ApiV2Client:
                 raise ApiV2RequestError(endpoint, e.code, reason) from e
             raise ApiV2CommunicationError(endpoint, e.code, reason) from e
         except URLError as e:
-            self._logger.error(
-                "URL error: %s for %s", e.reason, request.full_url
-            )
             # Proxy env vars (https_proxy, all_proxy) are respected by
             # urllib and may cause connection failures when set
             # unintentionally. We intentionally do not disable proxy — it
@@ -171,74 +204,101 @@ class _ApiV2Client:
             # of the codebase (NodeCommunicator, pcs/utils.py, pcsd/pcs.rb).
             # See: https://bugzilla.redhat.com/show_bug.cgi?id=1315627
             if is_proxy_set(os.environ):
-                self._logger.warning(
-                    "Proxy is set in environment variables, try disabling it"
+                self._report(
+                    ReportItem.warning(
+                        messages.NodeCommunicationProxyIsSet(
+                            node=self._transport.label
+                        )
+                    )
                 )
-            raise self._classify_url_error(e.reason) from e
+
+            endpoint = self._transport.label
+            # socket.timeout is an alias of TimeoutError since Python 3.10
+            if isinstance(e.reason, TimeoutError):
+                self._report(
+                    ReportItem.debug(
+                        messages.NodeCommunicationErrorTimedOut(
+                            self._transport.label,
+                            request.full_url,
+                            str(e.reason),
+                        )
+                    )
+                )
+                raise ApiV2TimeoutError(endpoint, self._api_v2_timeout) from e
+
+            # URLError.reason wraps the underlying cause of the failure. When that
+            # cause is an OSError, the request never got a usable response because
+            # we could not establish the connection in the first place, so we treat
+            # it as a connection error. This covers all the low-level failures we
+            # care about, because they all subclass OSError:
+            # - ConnectionError (e.g. connection refused/reset) is an OSError
+            # - DNS resolution failures (socket.gaierror) are OSErrors
+            # - SSL failures - ssl.SSLError
+            # - failures to open the unix socket file are OSErrors
+            # Anything else is a reason we don't specifically recognize, so we fall
+            # back to a generic communication error.
+            if isinstance(e.reason, OSError):
+                self._report(
+                    ReportItem.debug(
+                        messages.NodeCommunicationErrorUnableToConnect(
+                            self._transport.label,
+                            request.full_url,
+                            str(e.reason),
+                        )
+                    )
+                )
+                raise ApiV2ConnectionError(
+                    endpoint, reason=str(e.reason)
+                ) from e
+            self._report(
+                ReportItem.debug(
+                    messages.NodeCommunicationError(
+                        self._transport.label, request.full_url, str(e.reason)
+                    )
+                )
+            )
+            raise ApiV2CommunicationError(endpoint, reason=str(e.reason)) from e
         except TimeoutError as e:
             # A socket timeout may surface directly instead of wrapped in a
             # URLError
-            self._logger.error("Timeout for %s", request.full_url)
+            self._report(
+                ReportItem.debug(
+                    messages.NodeCommunicationErrorTimedOut(
+                        self._transport.label, request.full_url, str(e)
+                    )
+                )
+            )
             raise ApiV2TimeoutError(
                 self._transport.label, self._api_v2_timeout
             ) from e
         except Exception as e:
-            self._logger.error(
-                "Unexpected error %s for %s",
-                e.__class__.__name__,
-                request.full_url,
+            self._report(
+                ReportItem.debug(
+                    messages.NodeCommunicationDebugInfo(
+                        request.full_url,
+                        f"Unexpected error: {e.__class__.__name__}",
+                    )
+                )
             )
             raise ApiV2CommunicationError(
                 self._transport.label,
                 reason=f"Unexpected error: {e.__class__.__name__}",
             ) from e
 
-    def _classify_url_error(self, reason: Any) -> ApiV2CommunicationError:
-        endpoint = self._transport.label
-        # socket.timeout is an alias of TimeoutError since Python 3.10
-        if isinstance(reason, TimeoutError):
-            return ApiV2TimeoutError(endpoint, self._api_v2_timeout)
-
-        # URLError.reason wraps the underlying cause of the failure. When that
-        # cause is an OSError, the request never got a usable response because
-        # we could not establish the connection in the first place, so we treat
-        # it as a connection error. This covers all the low-level failures we
-        # care about, because they all subclass OSError:
-        # - ConnectionError (e.g. connection refused/reset) is an OSError
-        # - DNS resolution failures (socket.gaierror) are OSErrors
-        # - SSL failures - ssl.SSLError
-        # - failures to open the unix socket file are OSErrors
-        # Anything else is a reason we don't specifically recognize, so we fall
-        # back to a generic communication error.
-        if isinstance(reason, OSError):
-            return ApiV2ConnectionError(endpoint, reason=str(reason))
-        return ApiV2CommunicationError(endpoint, reason=str(reason))
-
-    def _log_poll_cycle(
-        self,
-        task_ident: str,
-        result_dto: TaskResultDto,
-        new_reports_dto: list[ReportItemDto],
+    def _report_poll_cycle(
+        self, task_ident: str, result_dto: TaskResultDto
     ) -> None:
         finish_type = result_dto.task_finish_type
-        kill_reason = result_dto.kill_reason
-        ident = task_ident
-        reports = [to_dict(r) for r in new_reports_dto]
-
-        if reports:
-            self._logger.debug("Task %s new reports: %s", ident, reports)
-
-        if finish_type == TaskFinishType.UNFINISHED:
-            self._logger.info("Task %s status: %s", ident, finish_type)
-            return
-
-        self._logger.info("Task %s finished with status %s", ident, finish_type)
-
+        detail = ""
         if finish_type == TaskFinishType.SUCCESS:
-            self._logger.info("Task %s result: %s", ident, result_dto.result)
-
-        if finish_type == TaskFinishType.KILL and kill_reason:
-            self._logger.info("Task %s kill reason: %s", ident, kill_reason)
+            detail = str(result_dto.result)
+        elif finish_type == TaskFinishType.KILL and result_dto.kill_reason:
+            detail = f"kill reason: {result_dto.kill_reason}"
+        self._report(
+            ReportItem.debug(
+                messages.ApiV2TaskStatus(task_ident, str(finish_type), detail)
+            )
+        )
 
 
 class ApiV2Connector:
@@ -249,7 +309,7 @@ class ApiV2Connector:
 
     def __init__(
         self,
-        logger: Logger,
+        reporters: Iterable[ReportProcessor],
         transport: Transport,
         context_node_name: str | None = None,
         effective_username: str | None = None,
@@ -261,14 +321,14 @@ class ApiV2Connector:
         self._effective_username = effective_username
         self._effective_groups = effective_groups
         self._apiv2_client = _ApiV2Client(
-            transport, logger, context_node_name, api_v2_timeout
+            transport, reporters, context_node_name, api_v2_timeout
         )
 
     @classmethod
     def for_unix_socket(
         cls,
         unix_socket_path: str,
-        logger: Logger,
+        reporters: Iterable[ReportProcessor],
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
@@ -278,7 +338,7 @@ class ApiV2Connector:
         Create connector for local unix socket
 
         unix_socket_path -- file path of the unix socket
-        logger -- instance for logging
+        reporters -- report processors to report communication diagnostics to
         effective_username --
         effective_groups --
         request_timeout -- timeout for the requests done inside created APIv2
@@ -286,7 +346,7 @@ class ApiV2Connector:
         api_v2_timeout -- timeout for requests done to APIv2 endpoints
         """
         return cls(
-            logger,
+            reporters,
             UnixSocketTransport(unix_socket_path),
             None,
             effective_username,
