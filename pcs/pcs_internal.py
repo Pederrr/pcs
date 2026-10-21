@@ -7,7 +7,7 @@ from dacite import DaciteError
 
 from pcs import settings, utils
 from pcs.cli.common.env_cli import Env
-from pcs.cli.common.lib_wrapper import Library
+from pcs.cli.common.lib_wrapper import load_module
 from pcs.common import communication
 from pcs.common.interface import dto
 from pcs.common.reports import ReportItem, ReportItemList, ReportProcessor
@@ -76,27 +76,23 @@ def main() -> None:
             communication.dto.InternalCommunicationRequestDto,
             json.load(sys.stdin),
         )
-        report_processor = LibraryReportProcessor()
-        cli_env = _get_cli_env(input_dto.options, report_processor)
-
-        # The apiv2_client is only used by Library.apiv2, which proxies commands
-        # over the network to a remote pcsd. pcs_internal only runs local
-        # library commands (see SUPPORTED_COMMANDS), so the apiv2 proxy is never
-        # reached here. Constructing an ApiV2Connector would be unnecessary, and
-        # passing None here is safe and intentional.
-        lib = Library(
-            cli_env,
-            utils.get_middleware_factory(),
-            None,  # type: ignore[arg-type]
-        )
         if input_dto.cmd not in SUPPORTED_COMMANDS:
             _exit(
                 communication.const.COM_STATUS_UNKNOWN_CMD,
                 status_msg=f"Unknown command '{input_dto.cmd}'",
             )
-        for sub_cmd in input_dto.cmd.split("."):
-            lib = getattr(lib, sub_cmd)
-        output_data = lib(**input_dto.cmd_data)  # type: ignore[operator]
+
+        report_processor = LibraryReportProcessor()
+        cli_env = _get_cli_env(input_dto.options, report_processor)
+
+        module_name, _, command_name = input_dto.cmd.partition(".")
+        lib_module = load_module(
+            cli_env, utils.get_middleware_factory(), module_name
+        )
+        lib_command = getattr(lib_module, command_name)
+
+        output_data = lib_command(**input_dto.cmd_data)
+
         _exit(
             communication.const.COM_STATUS_SUCCESS,
             report_list=report_processor.processed_items,
