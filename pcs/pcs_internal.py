@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from typing import Any, cast
+from typing import Any
 
 from dacite import DaciteError
 
@@ -38,18 +38,15 @@ def _exit(
     sys.exit(0)
 
 
-def get_cli_env(
+def _get_cli_env(
     options: communication.dto.InternalCommunicationRequestOptionsDto,
+    report_processor: ReportProcessor,
 ) -> Env:
     user, groups = utils.get_cib_user_groups()
     return Env(
         user=user,
         groups=groups,
-        # Debug messages always go to the processor. The parameter only affects if
-        # they will be printed to stdout. We are not printing the messages. Instead
-        # we get all the messages the processor got. So the value of the parameter
-        # does not matter.
-        report_processor=LibraryReportProcessor(),
+        report_processor=report_processor,
         known_hosts_getter=utils.read_known_hosts_file,
         request_timeout=options.request_timeout
         or settings.default_request_timeout,
@@ -79,10 +76,8 @@ def main() -> None:
             communication.dto.InternalCommunicationRequestDto,
             json.load(sys.stdin),
         )
-        cli_env = get_cli_env(input_dto.options)
-        report_processor = cast(
-            LibraryReportProcessor, cli_env.report_processor
-        )
+        report_processor = LibraryReportProcessor()
+        cli_env = _get_cli_env(input_dto.options, report_processor)
 
         # The apiv2_client is only used by Library.apiv2, which proxies commands
         # over the network to a remote pcsd. pcs_internal only runs local

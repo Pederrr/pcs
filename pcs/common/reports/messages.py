@@ -1312,9 +1312,8 @@ class PcsdConnectionError(ReportItemMessage):
 
     @property
     def message(self) -> str:
-        return "Unable to connect to pcsd{reason}".format(
-            reason=format_optional(self.reason, " ({})"),
-        )
+        reason = format_optional(self.reason, " ({})")
+        return f"Unable to connect to pcsd{reason}"
 
 
 @dataclass(frozen=True)
@@ -1330,9 +1329,8 @@ class PcsdCommunicationTimeout(ReportItemMessage):
 
     @property
     def message(self) -> str:
-        return "Communication with pcsd timed out{timeout}".format(
-            timeout=format_optional(self.timeout, " after {} seconds"),
-        )
+        timeout = format_optional(self.timeout, " after {} seconds")
+        return f"Communication with pcsd timed out{timeout}"
 
 
 @dataclass(frozen=True)
@@ -1348,9 +1346,8 @@ class PcsdCommunicationError(ReportItemMessage):
 
     @property
     def message(self) -> str:
-        return "Unable to communicate with pcsd{reason}".format(
-            reason=format_optional(self.reason, " ({})"),
-        )
+        reason = format_optional(self.reason, " ({})")
+        return f"Unable to communicate with pcsd{reason}"
 
 
 @dataclass(frozen=True)

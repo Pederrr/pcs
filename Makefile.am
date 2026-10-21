@@ -260,30 +260,32 @@ else
 python_test_options = -v --vanilla
 endif
 
+RUFF_CHECK_PACKAGES = pcs/ pcs_test/ scripts/
+
 ruff_format_check: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml format --check pcs/ pcs_test/ scripts/
+	$(TIME) ruff --config pyproject.toml format --check ${RUFF_CHECK_PACKAGES}
 endif
 
 ruff_format: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check --select I --fix pcs/ pcs_test/ scripts/
-	$(TIME) ruff --config pyproject.toml format pcs/ pcs_test/ scripts/
+	$(TIME) ruff --config pyproject.toml check --select I --fix ${RUFF_CHECK_PACKAGES}
+	$(TIME) ruff --config pyproject.toml format ${RUFF_CHECK_PACKAGES}
 endif
 
 ruff_isort_check: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check --select I pcs/ pcs_test/ scripts/
+	$(TIME) ruff --config pyproject.toml check --select I ${RUFF_CHECK_PACKAGES}
 endif
 
 ruff_isort: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check --select I --fix pcs/ pcs_test/ scripts/
+	$(TIME) ruff --config pyproject.toml check --select I --fix ${RUFF_CHECK_PACKAGES}
 endif
 
 ruff_lint: pyproject.toml
 if DEV_TESTS
-	$(TIME) ruff --config pyproject.toml check pcs/ pcs_test/ scripts/
+	$(TIME) ruff --config pyproject.toml check ${RUFF_CHECK_PACKAGES}
 endif
 
 mypy: gen-apiv2-stubs
