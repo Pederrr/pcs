@@ -2,6 +2,7 @@ import os
 from collections.abc import Iterable
 
 from pcs import settings
+from pcs.common.communication.utils import is_proxy_set
 from pcs.common.node_communicator import (
     CommunicatorLoggerInterface,
     Destination,
@@ -9,7 +10,6 @@ from pcs.common.node_communicator import (
     Response,
 )
 from pcs.common.reports import ReportItem, ReportProcessor, messages
-from pcs.lib.external import is_proxy_set
 
 
 def _get_port(port: int | None) -> int:

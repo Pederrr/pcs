@@ -150,6 +150,7 @@ EXTRA_DIST		= \
 			  common/communication/dto.py \
 			  common/communication/logger.py \
 			  common/communication/types.py \
+			  common/communication/utils.py \
 			  common/interface/dto.py \
 			  common/interface/__init__.py \
 			  common/node_communicator.py \

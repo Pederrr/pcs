@@ -38,6 +38,7 @@ from pcs.common import file as pcs_file
 from pcs.common import pacemaker as common_pacemaker
 from pcs.common import pcs_pycurl as pycurl
 from pcs.common.communication.api_v2_client import ApiV2Connector
+from pcs.common.communication.utils import is_proxy_set
 from pcs.common.host import PcsKnownHost
 from pcs.common.pacemaker.resource.operations import (
     OCF_CHECK_LEVEL_INSTANCE_ATTRIBUTE_NAME,
@@ -52,7 +53,7 @@ from pcs.common.types import StringSequence
 from pcs.lib.corosync.config_facade import ConfigFacade as corosync_conf_facade
 from pcs.lib.env import LibraryEnvironment
 from pcs.lib.errors import LibraryError
-from pcs.lib.external import CommandRunner, is_proxy_set
+from pcs.lib.external import CommandRunner
 from pcs.lib.file.instance import FileInstance as LibFileInstance
 from pcs.lib.host.config.facade import Facade as KnownHostsFacade
 from pcs.lib.interface.config import ParserErrorException

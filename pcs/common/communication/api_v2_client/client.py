@@ -14,6 +14,7 @@ from pcs.common.async_tasks.dto import (
     TaskResultDto,
 )
 from pcs.common.async_tasks.types import TaskFinishType
+from pcs.common.communication.utils import is_proxy_set
 from pcs.common.interface.dto import DataTransferObject, from_dict, to_dict
 from pcs.common.reports import (
     ReportItem,
@@ -23,7 +24,6 @@ from pcs.common.reports import (
     messages,
     report_dto_to_item,
 )
-from pcs.lib.external import is_proxy_set
 
 from .errors import (
     ApiV2CommunicationError,
