@@ -122,9 +122,8 @@ class PcsdConnectionError(CliReportMessageCustom):
     @property
     def message(self) -> str:
         return (
-            f"{self._obj.message}\n"
-            "Check if pcsd is running and your user is a member of the "
-            f"'{settings.pacemaker_gname}' group"
+            f"{self._obj.message}. Check if pcsd is running and your user is "
+            f"a member of the '{settings.pacemaker_gname}' group"
         )
 
 

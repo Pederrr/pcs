@@ -296,7 +296,7 @@ class _ApiV2Client:
             detail = f"kill reason: {result_dto.kill_reason}"
         self._report(
             ReportItem.debug(
-                messages.ApiV2TaskStatus(task_ident, str(finish_type), detail)
+                messages.ApiV2TaskStatus(task_ident, finish_type, detail)
             )
         )
 

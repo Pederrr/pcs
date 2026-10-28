@@ -2,6 +2,7 @@ import inspect
 from unittest import TestCase
 
 from pcs.common import file_type_codes
+from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.fencing_topology import (
     TARGET_TYPE_ATTRIBUTE,
     TARGET_TYPE_NODE,
@@ -3080,14 +3081,16 @@ class ApiV2TaskCreated(NameBuildTest):
 class ApiV2TaskStatus(NameBuildTest):
     def test_without_detail(self):
         self.assert_message_from_report(
-            "Task 'task-id' status: unfinished",
-            reports.ApiV2TaskStatus("task-id", "unfinished"),
+            "Task 'task-id' status: UNFINISHED",
+            reports.ApiV2TaskStatus("task-id", TaskFinishType.UNFINISHED),
         )
 
     def test_with_detail(self):
         self.assert_message_from_report(
-            "Task 'task-id' status: success (result data)",
-            reports.ApiV2TaskStatus("task-id", "success", "result data"),
+            "Task 'task-id' status: SUCCESS (result data)",
+            reports.ApiV2TaskStatus(
+                "task-id", TaskFinishType.SUCCESS, "result data"
+            ),
         )
 
 

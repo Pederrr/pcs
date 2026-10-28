@@ -5,6 +5,7 @@ from functools import partial
 from typing import Any, Literal, cast
 
 from pcs.common import file_type_codes
+from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.fencing_topology import (
     TARGET_TYPE_ATTRIBUTE,
     FencingTargetType,
@@ -4271,7 +4272,7 @@ class ApiV2TaskStatus(ReportItemMessage):
     """
 
     task_ident: str
-    finish_type: str
+    finish_type: TaskFinishType
     detail: str = ""
     _code = codes.API_V2_TASK_STATUS
 
