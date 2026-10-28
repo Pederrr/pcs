@@ -96,7 +96,7 @@ class _ApiV2Client:
         poll_interval -- describes how often the polling should happen, in seconds
         """
         request = self._transport.build_request(
-            f"/api/v2/task/result?task_ident={task_ident}", json_body=None
+            "/api/v2/task/result", query_params={"task_ident": task_ident}
         )
         reports_seen = 0
 

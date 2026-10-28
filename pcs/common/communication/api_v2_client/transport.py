@@ -1,7 +1,9 @@
 import ssl
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from http.client import HTTPResponse
 from ipaddress import AddressValueError, IPv6Address
+from urllib.parse import urlencode
 from urllib.request import Request, build_opener, urlopen
 
 from .handler import UnixSocketHttpHandler
@@ -30,23 +32,30 @@ class Transport(ABC):
         Human readable endpoint identifier.
         """
 
-    def build_request(self, path: str, json_body: bytes | None) -> Request:
+    def build_request(
+        self,
+        path: str,
+        json_body: bytes | None = None,
+        query_params: Mapping[str, str] | None = None,
+    ) -> Request:
         """
         Create a request
         """
         # Make sure the path always starts with slash
         path = path if path.startswith("/") else "/" + path
+        url = self._build_url(path)
+        if query_params:
+            url += f"?{urlencode(query_params)}"
 
         headers = (
             {"Content-Type": "application/json"}
             if json_body is not None
             else {}
         )
+
         # GET or POST is automatically used depending on the json_body
         return Request(
-            self._build_url(path),
-            data=json_body,
-            headers=self._build_headers(headers),
+            url=url, data=json_body, headers=self._build_headers(headers)
         )
 
     @abstractmethod
