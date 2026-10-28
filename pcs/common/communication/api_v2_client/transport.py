@@ -34,6 +34,9 @@ class Transport(ABC):
         """
         Create a request
         """
+        # Make sure the path always starts with slash
+        path = path if path.startswith("/") else "/" + path
+
         headers = (
             {"Content-Type": "application/json"}
             if json_body is not None
