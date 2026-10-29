@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any, TypeVar
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
@@ -49,11 +49,13 @@ class _ApiV2Client:
     def __init__(
         self,
         transport: Transport,
-        reporters: Iterable[ReportProcessor],
+        log_report_processor: ReportProcessor,
         context_node_name: str | None = None,
         api_v2_timeout: float = settings.default_request_timeout,
     ):
-        self._reporters = list(reporters)
+        # The log reports might contain sensitive data. Make sure we write
+        # these reports into correct places
+        self._log_report_processor = log_report_processor
         self._transport = transport
         self._api_v2_timeout = api_v2_timeout
         self._report_item_context = (
@@ -61,10 +63,6 @@ class _ApiV2Client:
             if context_node_name is None
             else ReportItemContext(context_node_name)
         )
-
-    def _report(self, report_item: ReportItem) -> None:
-        for reporter in self._reporters:
-            reporter.report(report_item)
 
     def task_create(self, command: CommandDto) -> str:
         """
@@ -78,7 +76,7 @@ class _ApiV2Client:
         )
         response = self._send_request(request, request_error_on_400=True)
         task_ident = self._parse_response(response, TaskIdentDto).task_ident
-        self._report(
+        self._log_report_processor.report(
             ReportItem.debug(
                 messages.ApiV2TaskCreated(task_ident, self._transport.label)
             )
@@ -133,8 +131,8 @@ class _ApiV2Client:
         try:
             return from_dict(dto_class, json.loads(response))
         except Exception as e:
-            self._report(
-                ReportItem.debug(
+            self._log_report_processor.report(
+                ReportItem.error(
                     messages.NodeCommunicationDebugInfo(
                         self._transport.label,
                         f"Response does not conform to {dto_class.__name__}: {e}",
@@ -149,7 +147,7 @@ class _ApiV2Client:
         self, request: Request, request_error_on_400: bool = False
     ) -> str:
         try:
-            self._report(
+            self._log_report_processor.report(
                 ReportItem.debug(
                     messages.NodeCommunicationStarted(
                         request.full_url, _request_data(request)
@@ -165,7 +163,7 @@ class _ApiV2Client:
                 request, self._api_v2_timeout
             ) as response:
                 body = response.read().decode("utf-8")
-                self._report(
+                self._log_report_processor.report(
                     ReportItem.debug(
                         messages.NodeCommunicationFinished(
                             request.full_url, response.status, body
@@ -174,8 +172,8 @@ class _ApiV2Client:
                 )
                 return body
         except HTTPError as e:
-            self._report(
-                ReportItem.debug(
+            self._log_report_processor.report(
+                ReportItem.error(
                     messages.NodeCommunicationError(
                         self._transport.label,
                         request.full_url,
@@ -204,7 +202,7 @@ class _ApiV2Client:
             # of the codebase (NodeCommunicator, pcs/utils.py, pcsd/pcs.rb).
             # See: https://bugzilla.redhat.com/show_bug.cgi?id=1315627
             if is_proxy_set(os.environ):
-                self._report(
+                self._log_report_processor.report(
                     ReportItem.warning(
                         messages.NodeCommunicationProxyIsSet(
                             node=self._transport.label
@@ -215,8 +213,8 @@ class _ApiV2Client:
             endpoint = self._transport.label
             # socket.timeout is an alias of TimeoutError since Python 3.10
             if isinstance(e.reason, TimeoutError):
-                self._report(
-                    ReportItem.debug(
+                self._log_report_processor.report(
+                    ReportItem.error(
                         messages.NodeCommunicationErrorTimedOut(
                             self._transport.label,
                             request.full_url,
@@ -238,8 +236,8 @@ class _ApiV2Client:
             # Anything else is a reason we don't specifically recognize, so we fall
             # back to a generic communication error.
             if isinstance(e.reason, OSError):
-                self._report(
-                    ReportItem.debug(
+                self._log_report_processor.report(
+                    ReportItem.error(
                         messages.NodeCommunicationErrorUnableToConnect(
                             self._transport.label,
                             request.full_url,
@@ -250,8 +248,8 @@ class _ApiV2Client:
                 raise ApiV2ConnectionError(
                     endpoint, reason=str(e.reason)
                 ) from e
-            self._report(
-                ReportItem.debug(
+            self._log_report_processor.report(
+                ReportItem.error(
                     messages.NodeCommunicationError(
                         self._transport.label, request.full_url, str(e.reason)
                     )
@@ -261,8 +259,8 @@ class _ApiV2Client:
         except TimeoutError as e:
             # A socket timeout may surface directly instead of wrapped in a
             # URLError
-            self._report(
-                ReportItem.debug(
+            self._log_report_processor.report(
+                ReportItem.error(
                     messages.NodeCommunicationErrorTimedOut(
                         self._transport.label, request.full_url, str(e)
                     )
@@ -272,8 +270,8 @@ class _ApiV2Client:
                 self._transport.label, self._api_v2_timeout
             ) from e
         except Exception as e:
-            self._report(
-                ReportItem.debug(
+            self._log_report_processor.report(
+                ReportItem.error(
                     messages.NodeCommunicationDebugInfo(
                         request.full_url,
                         f"Unexpected error: {e.__class__.__name__}",
@@ -294,7 +292,7 @@ class _ApiV2Client:
             detail = str(result_dto.result)
         elif finish_type == TaskFinishType.KILL and result_dto.kill_reason:
             detail = f"kill reason: {result_dto.kill_reason}"
-        self._report(
+        self._log_report_processor.report(
             ReportItem.debug(
                 messages.ApiV2TaskStatus(task_ident, finish_type, detail)
             )
@@ -309,7 +307,7 @@ class ApiV2Connector:
 
     def __init__(
         self,
-        reporters: Iterable[ReportProcessor],
+        log_report_processor: ReportProcessor,
         transport: Transport,
         context_node_name: str | None = None,
         effective_username: str | None = None,
@@ -321,14 +319,14 @@ class ApiV2Connector:
         self._effective_username = effective_username
         self._effective_groups = effective_groups
         self._apiv2_client = _ApiV2Client(
-            transport, reporters, context_node_name, api_v2_timeout
+            transport, log_report_processor, context_node_name, api_v2_timeout
         )
 
     @classmethod
     def for_unix_socket(
         cls,
         unix_socket_path: str,
-        reporters: Iterable[ReportProcessor],
+        log_report_processor: ReportProcessor,
         effective_username: str | None = None,
         effective_groups: list[str] | None = None,
         request_timeout: int | None = None,
@@ -338,7 +336,7 @@ class ApiV2Connector:
         Create connector for local unix socket
 
         unix_socket_path -- file path of the unix socket
-        reporters -- report processors to report communication diagnostics to
+        log_report_processor -- report processor for logging communication diagnostics
         effective_username -- name of effective user for the APIv2 tasks
         effective_groups -- groups of effective user for the APIv2 tasks
         request_timeout -- timeout for the requests done inside created APIv2
@@ -346,7 +344,7 @@ class ApiV2Connector:
         api_v2_timeout -- timeout for requests done to APIv2 endpoints
         """
         return cls(
-            reporters,
+            log_report_processor,
             UnixSocketTransport(unix_socket_path),
             None,
             effective_username,

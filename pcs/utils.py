@@ -31,7 +31,11 @@ from pcs.cli.common.lib_wrapper import Library
 from pcs.cli.common.parse_args import InputModifiers
 from pcs.cli.common.tools import print_to_stderr, timeout_to_seconds_legacy
 from pcs.cli.file import metadata as cli_file_metadata
-from pcs.cli.reports import ReportProcessorToConsole, process_library_reports
+from pcs.cli.reports import (
+    ReportProcessorToConsole,
+    preprocessor,
+    process_library_reports,
+)
 from pcs.cli.reports import output as reports_output
 from pcs.common import const, file_type_codes
 from pcs.common import file as pcs_file
@@ -2444,9 +2448,17 @@ def get_library_wrapper() -> Library:
     NOTE: usage of options may depend on used middleware for particular command
     """
     cli_env = get_cli_env()
+
+    report_processor = ReportProcessorToConsole(debug="--debug" in pcs_options)
+    # We want to see the details about communication only with --debug, so we
+    # turn all the reports into debug
+    report_processor.set_report_item_preprocessor(
+        preprocessor.all_debug_preprocessor
+    )
+
     apiv2_client = ApiV2Connector.for_unix_socket(
         settings.pcsd_unix_socket,
-        [cli_env.report_processor],
+        report_processor,
         cli_env.user,
         cli_env.groups,
         cli_env.request_timeout,

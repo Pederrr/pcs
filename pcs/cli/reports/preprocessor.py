@@ -118,3 +118,9 @@ def get_duplicate_constraint_exists_preprocessor(
         return report_item
 
     return _report_item_preprocessor
+
+
+def all_debug_preprocessor(
+    report_item: reports.ReportItem,
+) -> reports.ReportItem:
+    return reports.ReportItem.debug(report_item.message, report_item.context)
