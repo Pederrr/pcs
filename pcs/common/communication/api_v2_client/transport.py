@@ -42,7 +42,9 @@ class Transport(ABC):
         Create a request
         """
         # Make sure the path always starts with slash
-        path = path if path.startswith("/") else "/" + path
+        if not path.startswith("/"):
+            raise AssertionError(f"URL path '{path}' does not start with '/'")
+
         url = self._build_url(path)
         if query_params:
             url += f"?{urlencode(query_params)}"

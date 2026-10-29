@@ -41,7 +41,7 @@ def _request_data(request: Request) -> str:
     if request.data is None:
         return ""
     if isinstance(request.data, bytes):
-        return request.data.decode("utf-8", errors="replace")
+        return request.data.decode("utf-8")
     return str(request.data)
 
 
@@ -199,7 +199,7 @@ class _ApiV2Client:
             # Proxy env vars (https_proxy, all_proxy) are respected by
             # urllib and may cause connection failures when set
             # unintentionally. We intentionally do not disable proxy — it
-            # can be legitimate (e.g. webUI managing a remote cluster).
+            # can be legitimate.
             # Instead, we warn to aid debugging, consistent with the rest
             # of the codebase (NodeCommunicator, pcs/utils.py, pcsd/pcs.rb).
             # See: https://bugzilla.redhat.com/show_bug.cgi?id=1315627
