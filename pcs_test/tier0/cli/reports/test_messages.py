@@ -99,7 +99,8 @@ class PcsdConnectionError(CliReportMessageTestBase):
             messages.PcsdConnectionError("connection refused"),
             (
                 "Unable to connect to pcsd (connection refused). Check if pcsd "
-                "is running and your user is a member of the 'haclient' group"
+                "is running and your user has the correct permissions to use "
+                "pcsd."
             ),
         )
 

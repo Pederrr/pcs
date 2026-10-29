@@ -2,7 +2,6 @@ from collections.abc import Mapping
 from functools import partial
 from typing import Any, get_type_hints
 
-from pcs import settings
 from pcs.common import file_type_codes
 from pcs.common.reports import codes, const, dto, item, messages, types
 from pcs.common.str_tools import (
@@ -122,8 +121,8 @@ class PcsdConnectionError(CliReportMessageCustom):
     @property
     def message(self) -> str:
         return (
-            f"{self._obj.message}. Check if pcsd is running and your user is "
-            f"a member of the '{settings.pacemaker_gname}' group"
+            f"{self._obj.message}. Check if pcsd is running and your user has "
+            "the correct permissions to use pcsd."
         )
 
 
