@@ -5,7 +5,6 @@ from functools import partial
 from typing import Any, Literal, cast
 
 from pcs.common import file_type_codes
-from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.fencing_topology import (
     TARGET_TYPE_ATTRIBUTE,
     FencingTargetType,
@@ -4241,45 +4240,6 @@ class AgentGenericError(ReportItemMessage):
     @property
     def message(self) -> str:
         return f"Unable to load agent '{self.agent}'"
-
-
-@dataclass(frozen=True)
-class ApiV2TaskCreated(ReportItemMessage):
-    """
-    An APIv2 task has been created on a node, debug info
-
-    task_ident -- identifier of the created task
-    target -- endpoint the task was created on (node address / socket path)
-    """
-
-    task_ident: str
-    target: str
-    _code = codes.API_V2_TASK_CREATED
-
-    @property
-    def message(self) -> str:
-        return f"Created task '{self.task_ident}' on {self.target}"
-
-
-@dataclass(frozen=True)
-class ApiV2TaskStatus(ReportItemMessage):
-    """
-    Status of an APIv2 task observed while polling for its result, debug info
-
-    task_ident -- identifier of the task
-    finish_type -- current task finish type (unfinished / success / fail / kill)
-    detail -- extra context for finished tasks (result or kill reason)
-    """
-
-    task_ident: str
-    finish_type: TaskFinishType
-    detail: str = ""
-    _code = codes.API_V2_TASK_STATUS
-
-    @property
-    def message(self) -> str:
-        detail = format_optional(self.detail, " ({})")
-        return f"Task '{self.task_ident}' status: {self.finish_type}{detail}"
 
 
 @dataclass(frozen=True)

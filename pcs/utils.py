@@ -33,7 +33,6 @@ from pcs.cli.common.tools import print_to_stderr, timeout_to_seconds_legacy
 from pcs.cli.file import metadata as cli_file_metadata
 from pcs.cli.reports import (
     ReportProcessorToConsole,
-    preprocessor,
     process_library_reports,
 )
 from pcs.cli.reports import output as reports_output
@@ -2435,6 +2434,35 @@ def get_middleware_factory():
     )
 
 
+class _ApiV2LogFormatter(logging.Formatter):
+    """
+    Format log records the same way pcs CLI prints reports to the console:
+    warnings and errors get a severity prefix, other messages are printed as
+    they are.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        message = super().format(record)
+        if record.levelno >= logging.ERROR:
+            return f"Error: {message}"
+        if record.levelno >= logging.WARNING:
+            return f"Warning: {message}"
+        return message
+
+
+def _get_apiv2_log_logger() -> logging.Logger:
+    logger = logging.getLogger("pcs.apiv2_client")
+    logger.propagate = False
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(_ApiV2LogFormatter())
+        logger.addHandler(handler)
+    logger.setLevel(
+        logging.DEBUG if "--debug" in pcs_options else logging.WARNING
+    )
+    return logger
+
+
 def get_library_wrapper() -> Library:
     """
     Commandline options:
@@ -2449,16 +2477,9 @@ def get_library_wrapper() -> Library:
     """
     cli_env = get_cli_env()
 
-    report_processor = ReportProcessorToConsole(debug="--debug" in pcs_options)
-    # We want to see the details about communication only with --debug, so we
-    # turn all the reports into debug
-    report_processor.set_report_item_preprocessor(
-        preprocessor.all_debug_preprocessor
-    )
-
     apiv2_client = ApiV2Connector.for_unix_socket(
         settings.pcsd_unix_socket,
-        report_processor,
+        _get_apiv2_log_logger(),
         cli_env.user,
         cli_env.groups,
         cli_env.request_timeout,

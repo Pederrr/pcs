@@ -2,7 +2,6 @@ import inspect
 from unittest import TestCase
 
 from pcs.common import file_type_codes
-from pcs.common.async_tasks.types import TaskFinishType
 from pcs.common.fencing_topology import (
     TARGET_TYPE_ATTRIBUTE,
     TARGET_TYPE_NODE,
@@ -3067,30 +3066,6 @@ class AgentGenericError(NameBuildTest):
         self.assert_message_from_report(
             "Unable to load agent 'agent-name'",
             reports.AgentGenericError("agent-name"),
-        )
-
-
-class ApiV2TaskCreated(NameBuildTest):
-    def test_all(self):
-        self.assert_message_from_report(
-            "Created task 'task-id' on /var/run/pcsd.socket",
-            reports.ApiV2TaskCreated("task-id", "/var/run/pcsd.socket"),
-        )
-
-
-class ApiV2TaskStatus(NameBuildTest):
-    def test_without_detail(self):
-        self.assert_message_from_report(
-            "Task 'task-id' status: UNFINISHED",
-            reports.ApiV2TaskStatus("task-id", TaskFinishType.UNFINISHED),
-        )
-
-    def test_with_detail(self):
-        self.assert_message_from_report(
-            "Task 'task-id' status: SUCCESS (result data)",
-            reports.ApiV2TaskStatus(
-                "task-id", TaskFinishType.SUCCESS, "result data"
-            ),
         )
 
 
