@@ -149,6 +149,7 @@ EXTRA_DIST		= \
 			  tier0/common/__init__.py \
 			  tier0/common/communication/__init__.py \
 			  tier0/common/communication/api_v2_client/__init__.py \
+			  tier0/common/communication/api_v2_client/test_client_integration.py \
 			  tier0/common/communication/api_v2_client/test_client.py \
 			  tier0/common/communication/api_v2_client/test_transport.py \
 			  tier0/common/communication/test_logger.py \
