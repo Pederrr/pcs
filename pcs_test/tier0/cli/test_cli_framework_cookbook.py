@@ -16,6 +16,7 @@ from pcs.common.reports.messages import (
 from pcs.lib.errors import LibraryError
 
 from pcs_test.tools import cli_test_framework as ctf
+from pcs_test.tools.cli_test_framework.call_specs import ActualCall
 
 
 class TagCreate(TestCase):
@@ -429,6 +430,29 @@ class ClusterReloadCorosyncConf(TestCase):
         )
 
 
+class HostDeauth(TestCase):
+    # Commands calling lib.apiv2.<module>.<command>(...) are expected using
+    # ApiV2CallSpec with the APIv2 command name and keyword arguments. Other
+    # options (output, raises, reports) work the same as in LibCallSpec. See
+    # pcs_test/tier0/cli/test_host.py for full coverage of this command.
+
+    def test_no_kwargs(self):
+        ctf.run(
+            "host deauth",
+            lib_calls=[ctf.ApiV2CallSpec("auth.deauth_all_local_hosts")],
+        )
+
+    def test_kwargs(self):
+        ctf.run(
+            "host deauth node1 node2",
+            lib_calls=[
+                ctf.ApiV2CallSpec(
+                    "auth.deauth_hosts", {"hosts": ["node1", "node2"]}
+                )
+            ],
+        )
+
+
 # The classes below are not cookbook examples - they are self-tests of the
 # framework itself. The cookbook above exercises the happy paths; these verify
 # the framework's checking machinery actually fails when it should.
@@ -488,6 +512,87 @@ class FrameworkSignatureMismatch(TestCase):
                 lib_calls=[
                     ctf.LibCallSpec("tag.create", ("a", ["b"], "extra"))
                 ],
+            )
+
+
+class FrameworkApiV2(TestCase):
+    def test_lib_spec_does_not_match_apiv2_call(self):
+        with self.assertRaisesRegex(
+            AssertionError,
+            "expected 'auth.deauth_hosts' but got 'apiv2.auth.deauth_hosts'",
+        ):
+            ctf.run(
+                "host deauth node1",
+                lib_calls=[ctf.LibCallSpec("auth.deauth_hosts", (["node1"],))],
+            )
+
+    def test_wrong_command(self):
+        with self.assertRaisesRegex(
+            AssertionError,
+            "expected 'apiv2.auth.deauth_all_local_hosts' but got "
+            "'apiv2.auth.deauth_hosts'",
+        ):
+            ctf.run(
+                "host deauth node1",
+                lib_calls=[ctf.ApiV2CallSpec("auth.deauth_all_local_hosts")],
+            )
+
+    def test_unknown_command(self):
+        with self.assertRaisesRegex(
+            AssertionError, "Unknown APIv2 command 'auth.deauth_hostz'"
+        ):
+            ctf.run(
+                "host deauth node1",
+                lib_calls=[
+                    ctf.ApiV2CallSpec("auth.deauth_hostz", {"hosts": ["node1"]})
+                ],
+            )
+
+    def test_args_mismatch(self):
+        with self.assertRaisesRegex(AssertionError, "args mismatch"):
+            ctf.run(
+                "host deauth node1",
+                lib_calls=[
+                    ctf.ApiV2CallSpec("auth.deauth_hosts", {"hosts": ["nodeX"]})
+                ],
+            )
+
+    def test_signature_mismatch(self):
+        with self.assertRaisesRegex(
+            AssertionError,
+            "Expected library call #1 'apiv2.auth.deauth_hosts' does not "
+            "match the command signature",
+        ):
+            ctf.run(
+                "host deauth node1",
+                lib_calls=[
+                    ctf.ApiV2CallSpec("auth.deauth_hosts", {"nodes": ["node1"]})
+                ],
+            )
+
+    def test_signature_type_mismatch(self):
+        with self.assertRaisesRegex(
+            AssertionError,
+            "Expected library call #1 'apiv2.auth.deauth_hosts' does not "
+            "match the command signature",
+        ):
+            ctf.run(
+                "host deauth node1",
+                lib_calls=[
+                    ctf.ApiV2CallSpec("auth.deauth_hosts", {"nodes": "node1"})
+                ],
+            )
+
+    def test_positional_args_rejected(self):
+        # ApiV2CommandProxy accepts keyword arguments only, so a CLI command
+        # passing positional arguments would fail in reality
+        with self.assertRaisesRegex(
+            AssertionError, "accept keyword arguments only"
+        ):
+            ctf.ApiV2CallSpec("auth.deauth_hosts", {"hosts": ["node1"]}).verify(
+                ActualCall(("apiv2", "auth", "deauth_hosts"), (["node1"],), {}),
+                1,
+                "",
             )
 
 

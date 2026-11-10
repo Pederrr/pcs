@@ -27,10 +27,20 @@ Example::
                 exit_code=1,
                 stderr=ctf.prepare_stderr_usage("tag", "create")
             )
+
+APIv2 commands called via lib.apiv2 are expected using ApiV2CallSpec, which
+takes the APIv2 command name (as in COMMAND_MAP) and keyword arguments::
+
+    ctf.run(
+        "host deauth node1",
+        lib_calls=[
+            ctf.ApiV2CallSpec("auth.deauth_hosts", {"hosts": ["node1"]}),
+        ],
+    )
 """
 
 from pcs_test.tools.cli_test_framework.call_specs import (
-    CallSpec,
+    ApiV2CallSpec,
     LibCallSpec,
 )
 from pcs_test.tools.cli_test_framework.runner import (

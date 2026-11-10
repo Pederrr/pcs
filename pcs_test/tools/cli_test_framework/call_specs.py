@@ -94,35 +94,109 @@ class LibCallSpec(CallSpec):
                 f"{all_calls}"
             )
 
-        # Translate positional and keyword arguments into keyword arguments
-        # using the real library function signature. This helps to determine if
-        # the signature of function is correctly called.
-        func = _resolve_lib_function(self.method)
-        try:
-            expected_kwargs = _bind_to_kwargs(func, self.args, self.kwargs)
-        except TypeError as e:
-            raise AssertionError(
-                f"Expected library call #{index} '{self.method}' "
-                f"does not match the command signature: {e}"
-            ) from e
-        try:
-            actual_kwargs = _bind_to_kwargs(func, actual.args, actual.kwargs)
-        except TypeError as e:
-            raise AssertionError(
-                f"Actual library call #{index} '{self.method}' "
-                f"does not match the command signature: {e}"
-            ) from e
+        _verify_args_by_signature(
+            _resolve_lib_function(self.method),
+            self.method,
+            _ExpectedArgs(self.args, self.kwargs),
+            actual,
+            index,
+            all_calls,
+        )
 
-        if actual_kwargs != expected_kwargs:
+
+@dataclass(frozen=True)
+class ApiV2CallSpec(CallSpec):
+    """
+    Expected call of an APIv2 command, e.g. lib.apiv2.auth.deauth_hosts(...)
+
+    command -- APIv2 command name as in COMMAND_MAP, e.g. 'auth.deauth_hosts'
+    kwargs -- expected keyword arguments, APIv2 commands accept no positional
+        arguments
+    """
+
+    command: str
+    kwargs: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def _full_name(self) -> str:
+        return f"{_APIV2_PREFIX}.{self.command}"
+
+    def describe(self) -> str:
+        return f"{self._full_name}({format_call_args((), self.kwargs)})"
+
+    def verify(self, actual: ActualCall, index: int, all_calls: str) -> None:
+        # Resolve first, so that a typo in the spec is reported as such even
+        # when the actual call is different
+        func = _resolve_apiv2_function(self.command)
+        if actual.name != self._full_name:
             raise AssertionError(
-                f"Library call #{index} '{self.method}': "
-                f"args mismatch\n"
-                f"  Expected: "
-                f"{format_call_args(self.args, self.kwargs)}\n"
-                f"  Actual:   "
+                f"Library call #{index}: expected "
+                f"'{self._full_name}' but got '{actual.name}'\n"
+                f"  Expected args: {format_call_args((), self.kwargs)}\n"
+                f"  Actual args:   "
                 f"{format_call_args(actual.args, actual.kwargs)}\n"
                 f"{all_calls}"
             )
+        # ApiV2CommandProxy.__call__ accepts keyword arguments only
+        if actual.args:
+            raise AssertionError(
+                f"Actual APIv2 call #{index} '{self._full_name}' "
+                "uses positional arguments, APIv2 commands accept keyword "
+                "arguments only: "
+                f"{format_call_args(actual.args, actual.kwargs)}"
+            )
+        _verify_args_by_signature(
+            func,
+            self._full_name,
+            _ExpectedArgs((), self.kwargs),
+            actual,
+            index,
+            all_calls,
+        )
+
+
+_APIV2_PREFIX = "apiv2"
+
+
+@dataclass(frozen=True)
+class _ExpectedArgs:
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+
+
+def _verify_args_by_signature(
+    func: Any,
+    name: str,
+    expected: _ExpectedArgs,
+    actual: ActualCall,
+    index: int,
+    all_calls: str,
+) -> None:
+    # Translate positional and keyword arguments into keyword arguments using
+    # the real library function signature. This helps to determine if the
+    # signature of function is correctly called.
+    try:
+        expected_kwargs = _bind_to_kwargs(func, expected.args, expected.kwargs)
+    except TypeError as e:
+        raise AssertionError(
+            f"Expected library call #{index} '{name}' "
+            f"does not match the command signature: {e}"
+        ) from e
+    try:
+        actual_kwargs = _bind_to_kwargs(func, actual.args, actual.kwargs)
+    except TypeError as e:
+        raise AssertionError(
+            f"Actual library call #{index} '{name}' "
+            f"does not match the command signature: {e}"
+        ) from e
+
+    if actual_kwargs != expected_kwargs:
+        raise AssertionError(
+            f"Library call #{index} '{name}': args mismatch\n"
+            f"  Expected: {format_call_args(expected.args, expected.kwargs)}\n"
+            f"  Actual:   {format_call_args(actual.args, actual.kwargs)}\n"
+            f"{all_calls}"
+        )
 
 
 def format_call_args(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
@@ -159,6 +233,21 @@ def _resolve_lib_function(method: str) -> Any:
             f"Library module '{module_name}' has no command '{method_name}' "
             f"for call '{method}': {e}"
         ) from e
+
+
+def _resolve_apiv2_function(command: str) -> Any:
+    # imported here so the daemon command mapping is loaded only by tests
+    # which actually use APIv2 calls
+    from pcs.daemon.async_tasks.worker.command_mapping import (  # noqa: PLC0415
+        COMMAND_MAP,
+    )
+
+    try:
+        return COMMAND_MAP[command].cmd
+    except KeyError:
+        raise AssertionError(
+            f"Unknown APIv2 command '{command}', it is not in COMMAND_MAP"
+        ) from None
 
 
 def _bind_to_kwargs(
