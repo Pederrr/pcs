@@ -5,7 +5,11 @@ from pcs.cli import host
 from pcs.cli.common.errors import CmdLineInputError
 from pcs.common.auth import HostAuthData, HostWithTokenAuthData
 from pcs.common.host import Destination
+from pcs.common.reports import ReportItem
+from pcs.common.reports.messages import HostNotFound
+from pcs.lib.errors import LibraryError
 
+from pcs_test.tools import cli_test_framework as ctf
 from pcs_test.tools.misc import dict_to_modifiers
 
 
@@ -153,27 +157,63 @@ class HostAuth(TestCase):
 
 
 class DeauthHosts(TestCase):
-    def setUp(self):
-        self.lib = mock.Mock(spec_set=["auth"])
-        self.lib.auth = mock.Mock(
-            spec_set=["deauth_hosts", "deauth_all_local_hosts"]
-        )
+    supported_flags = ["--request-timeout"]
 
     def test_success_no_args(self):
-        host.deauth_cmd(self.lib, [], dict_to_modifiers({}))
-
-        self.lib.auth.deauth_all_local_hosts.assert_called_once_with()
-        self.lib.auth.deauth_hosts.assert_not_called()
+        ctf.run(
+            "host deauth",
+            lib_calls=ctf.ApiV2CallSpec("auth.deauth_all_local_hosts"),
+            supported_flags=self.supported_flags,
+        )
 
     def test_success_args(self):
-        host.deauth_cmd(self.lib, ["node1", "node2"], dict_to_modifiers({}))
+        ctf.run(
+            "host deauth node1 node2",
+            lib_calls=ctf.ApiV2CallSpec(
+                "auth.deauth_hosts", {"hosts": ["node1", "node2"]}
+            ),
+            supported_flags=self.supported_flags,
+        )
 
-        self.lib.auth.deauth_all_local_hosts.assert_not_called()
-        self.lib.auth.deauth_hosts.assert_called_once_with(["node1", "node2"])
+    def test_success_request_timeout(self):
+        ctf.run(
+            "host deauth node1 --request-timeout=10",
+            lib_calls=ctf.ApiV2CallSpec(
+                "auth.deauth_hosts", {"hosts": ["node1"]}
+            ),
+            supported_flags=self.supported_flags,
+        )
 
     def test_non_unique_args(self):
-        with self.assertRaises(CmdLineInputError):
-            host.deauth_cmd(self.lib, ["node1", "node1"], dict_to_modifiers({}))
+        ctf.run(
+            "host deauth node1 node1",
+            exit_code=1,
+            stderr="Error: duplicate argument: 'node1'\n",
+            supported_flags=self.supported_flags,
+        )
 
-        self.lib.auth.deauth_all_local_hosts.assert_not_called()
-        self.lib.auth.deauth_hosts.assert_not_called()
+    def test_unsupported_option(self):
+        ctf.run(
+            "host deauth node1 --force",
+            exit_code=1,
+            stderr=(
+                "Error: Specified option '--force' is not supported in this"
+                " command\n"
+            ),
+            supported_flags=self.supported_flags,
+        )
+
+    def test_library_error(self):
+        reports = [ReportItem.error(HostNotFound(["node1"]))]
+        ctf.run(
+            "host deauth node1",
+            lib_calls=ctf.ApiV2CallSpec(
+                "auth.deauth_hosts",
+                {"hosts": ["node1"]},
+                reports=reports,
+                raises=LibraryError(),
+            ),
+            exit_code=1,
+            stderr=ctf.prepare_stderr_reports(reports, additional_error=True),
+            supported_flags=self.supported_flags,
+        )
