@@ -29,8 +29,11 @@ Example::
             )
 """
 
-from pcs_test.tools.cli_test_framework.runner import (
+from pcs_test.tools.cli_test_framework.call_specs import (
+    CallSpec,
     LibCallSpec,
+)
+from pcs_test.tools.cli_test_framework.runner import (
     prepare_stderr_reports,
     prepare_stderr_usage,
     run,

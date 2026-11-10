@@ -555,6 +555,7 @@ EXTRA_DIST		= \
 			  tools/check/test_misc.py \
 			  tools/cib.py \
 			  tools/cli_test_framework/__init__.py \
+			  tools/cli_test_framework/call_specs.py \
 			  tools/cli_test_framework/mock_lib_wrapper.py \
 			  tools/cli_test_framework/runner.py \
 			  tools/color_text_runner/format.py \

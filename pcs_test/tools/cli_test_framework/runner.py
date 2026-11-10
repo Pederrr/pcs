@@ -9,10 +9,8 @@ from pcs.cli.common.parse_args import InputModifiers
 from pcs.cli.reports.processor import ReportProcessorToConsole
 from pcs.common.reports import ReportItemList
 
-from pcs_test.tools.cli_test_framework.mock_lib_wrapper import (
-    LibCallSpec,
-    MockLibrary,
-)
+from pcs_test.tools.cli_test_framework.call_specs import CallSpec
+from pcs_test.tools.cli_test_framework.mock_lib_wrapper import MockLibrary
 
 
 class _SupportedFlagsTracker:
@@ -71,7 +69,7 @@ class _PreserveAttrs:
 
 def run(
     command: str | list[str],
-    lib_calls: list[LibCallSpec] | LibCallSpec | None = None,
+    lib_calls: list[CallSpec] | CallSpec | None = None,
     exit_code: int | str | None = 0,
     stdout: str = "",
     stderr: str = "",
@@ -80,7 +78,7 @@ def run(
     argv = shlex.split(command) if isinstance(command, str) else list(command)
     if lib_calls is None:
         lib_calls = []
-    elif isinstance(lib_calls, LibCallSpec):
+    elif isinstance(lib_calls, CallSpec):
         lib_calls = [lib_calls]
 
     mock_lib = MockLibrary(lib_calls)
