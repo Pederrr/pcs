@@ -37,13 +37,18 @@ class _FakeTransport(Transport):
     request data are realistic) but routes open() through a mock.
     """
 
-    def __init__(self, label=LABEL):
+    def __init__(self, label=LABEL, respects_proxy=True):
         self._label = label
+        self._respects_proxy = respects_proxy
         self.open_mock = mock.MagicMock(name="open")
 
     @property
     def label(self):
         return self._label
+
+    @property
+    def respects_proxy(self):
+        return self._respects_proxy
 
     def _build_url(self, path):
         return f"{BASE_URL}{path}"
@@ -155,6 +160,21 @@ class SendRequestUrlError(SendRequestBase):
                 mock.call.warning(
                     "Proxy is set in environment variables, try disabling it"
                 ),
+                mock.call.debug("Error calling %s: %s", self.full_url, "boom"),
+            ],
+        )
+
+    @mock.patch.object(client, "is_proxy_set", return_value=True)
+    def test_proxy_set_no_warning_if_transport_ignores_proxy(self, mock_proxy):
+        self.transport._respects_proxy = False
+        self.transport.open_mock.side_effect = URLError("boom")
+        with self.assertRaises(ApiV2CommunicationError):
+            self.client._send_request(self.request)
+        mock_proxy.assert_not_called()
+        self.assertEqual(
+            self.logger.mock_calls,
+            [
+                _log_started(self.full_url),
                 mock.call.debug("Error calling %s: %s", self.full_url, "boom"),
             ],
         )

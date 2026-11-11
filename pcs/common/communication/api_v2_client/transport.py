@@ -32,6 +32,13 @@ class Transport(ABC):
         Human readable endpoint identifier.
         """
 
+    @property
+    @abstractmethod
+    def respects_proxy(self) -> bool:
+        """
+        Whether proxy settings from environment variables affect the requests.
+        """
+
     def build_request(
         self,
         path: str,
@@ -96,6 +103,11 @@ class TcpTransport(Transport):
     def label(self) -> str:
         return self._host
 
+    @property
+    def respects_proxy(self) -> bool:
+        # urlopen uses the default opener which includes ProxyHandler
+        return True
+
     def _build_url(self, path: str) -> str:
         return f"https://{self._host}{path}"
 
@@ -120,6 +132,12 @@ class UnixSocketTransport(Transport):
     @property
     def label(self) -> str:
         return self._socket_path
+
+    @property
+    def respects_proxy(self) -> bool:
+        # Requests are sent directly over the unix socket by
+        # UnixSocketHttpHandler, the unix:// scheme is not proxied
+        return False
 
     def _build_url(self, path: str) -> str:
         # The host is irrelevant for a Unix socket connection but urllib

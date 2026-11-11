@@ -47,6 +47,10 @@ class _StubTransport(Transport):
     def label(self):
         return self._label
 
+    @property
+    def respects_proxy(self):
+        return True
+
     def _build_url(self, path):
         return f"{self._origin}{path}"
 
@@ -114,6 +118,9 @@ class TcpTransportTest(TestCase):
     def test_label_is_host_and_port(self):
         self.assertEqual(self.transport.label, f"{ADDR}:{PORT}")
 
+    def test_respects_proxy(self):
+        self.assertTrue(self.transport.respects_proxy)
+
     def test_label_brackets_ipv6(self):
         self.assertEqual(
             TcpTransport("::1", PORT, TOKEN).label, f"[::1]:{PORT}"
@@ -160,6 +167,9 @@ class UnixSocketTransportTest(TestCase):
 
     def test_label_is_socket_path(self):
         self.assertEqual(self.transport.label, SOCKET_PATH)
+
+    def test_does_not_respect_proxy(self):
+        self.assertFalse(self.transport.respects_proxy)
 
     def test_build_url_uses_unix_scheme(self):
         self.assertEqual(

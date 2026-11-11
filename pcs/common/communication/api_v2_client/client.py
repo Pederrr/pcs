@@ -184,7 +184,8 @@ class _ApiV2Client:
             # Instead, we warn to aid debugging, consistent with the rest
             # of the codebase (NodeCommunicator, pcs/utils.py, pcsd/pcs.rb).
             # See: https://bugzilla.redhat.com/show_bug.cgi?id=1315627
-            if is_proxy_set(os.environ):
+            # Only warn when the transport actually goes through a proxy.
+            if self._transport.respects_proxy and is_proxy_set(os.environ):
                 self._logger.warning(
                     "Proxy is set in environment variables, try disabling it"
                 )
