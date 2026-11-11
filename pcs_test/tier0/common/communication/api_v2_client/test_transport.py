@@ -13,6 +13,7 @@ SOCKET_PATH = "/run/pcsd.sock"
 ADDR = "node1.example.com"
 PORT = 2224
 TOKEN = "secret-token"
+URL_ORIGIN = "http://stub"
 URL_PATH = "/foo/bar"
 
 
@@ -38,7 +39,8 @@ class _StubTransport(Transport):
     without any real I/O.
     """
 
-    def __init__(self, label="stub"):
+    def __init__(self, origin=URL_ORIGIN, label="stub"):
+        self._origin = origin
         self._label = label
 
     @property
@@ -46,7 +48,7 @@ class _StubTransport(Transport):
         return self._label
 
     def _build_url(self, path):
-        return f"http://stub{path}"
+        return f"{self._origin}{path}"
 
     def open(self, request, timeout):
         del request, timeout
@@ -65,7 +67,7 @@ class BuildRequest(TestCase):
     def test_get_request_without_body(self):
         request = self.transport.build_request(URL_PATH)
 
-        self.assertEqual(request.full_url, f"http://stub{URL_PATH}")
+        self.assertEqual(request.full_url, f"{URL_ORIGIN}{URL_PATH}")
         self.assertEqual(request.get_method(), "GET")
         self.assertIsNone(request.data)
         self.assertFalse(request.has_header("Content-type"))
@@ -74,7 +76,7 @@ class BuildRequest(TestCase):
         body = b'{"a": 1}'
         request = self.transport.build_request(URL_PATH, json_body=body)
 
-        self.assertEqual(request.full_url, f"http://stub{URL_PATH}")
+        self.assertEqual(request.full_url, f"{URL_ORIGIN}{URL_PATH}")
         self.assertEqual(request.get_method(), "POST")
         self.assertEqual(request.data, body)
         self.assertEqual(request.get_header("Content-type"), "application/json")
@@ -86,7 +88,7 @@ class BuildRequest(TestCase):
 
         self.assertEqual(
             request.full_url,
-            f"http://stub{URL_PATH}?task_ident=tid",
+            f"{URL_ORIGIN}{URL_PATH}?task_ident=tid",
         )
 
     def test_query_params_are_url_encoded(self):
@@ -96,13 +98,13 @@ class BuildRequest(TestCase):
 
         self.assertEqual(
             request.full_url,
-            f"http://stub{URL_PATH}?task_ident=a+b%2Fc&x=1%262",
+            f"{URL_ORIGIN}{URL_PATH}?task_ident=a+b%2Fc&x=1%262",
         )
 
     def test_empty_query_params_are_ignored(self):
         request = self.transport.build_request(URL_PATH, query_params={})
 
-        self.assertEqual(request.full_url, f"http://stub{URL_PATH}")
+        self.assertEqual(request.full_url, f"{URL_ORIGIN}{URL_PATH}")
 
 
 class TcpTransportTest(TestCase):
