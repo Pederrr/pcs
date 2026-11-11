@@ -242,6 +242,7 @@ def _resolve_apiv2_function(command: str) -> Any:
         COMMAND_MAP,
     )
 
+    # TODO - Legacy Command Map check
     try:
         return COMMAND_MAP[command].cmd
     except KeyError:

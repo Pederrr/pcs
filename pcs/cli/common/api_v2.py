@@ -44,6 +44,10 @@ class ApiV2CommandProxy:
             f"{self._command_name}.{name}" if self._command_name else name,
         )
 
+    # TODO - make sure the command proxy actually returns what it is supposed to return
+    # dto with response has result typed as ANY - so no recursive translation is done :cry:
+    # we should translate the data according to the command type anotation
+    # should be doable
     def __call__(self, **kwargs: Any) -> Any:
         success = False
         new_reports: reports.ReportItemList = []
