@@ -461,26 +461,6 @@ class _RunCommandMixin:
             mock_sleep.call_args_list, [mock.call(timeout)] * count
         )
 
-    def _assert_task_not_success(
-        self, mock_sleep, finish_type, kill_reason=None, detail=""
-    ):
-        result_body = _result_body(
-            finish_type=finish_type, kill_reason=kill_reason
-        )
-        self.server.add_response(200, _task_ident_body())
-        self.server.add_response(200, result_body)
-
-        results = list(self.connector.run_command("some.cmd", {}))
-
-        self.assert_client_results(results, [([], False, None)])
-        self.assert_poll_sleep(mock_sleep, 0)
-        self.assert_logs(
-            [
-                *self.fixture_create_logs(),
-                *self.fixture_poll_logs(result_body, finish_type, detail),
-            ]
-        )
-
     def test_simple_round_trip(self, mock_sleep):
         result_body = _result_body(
             finish_type=TaskFinishType.SUCCESS, result={"out": "ok"}
@@ -577,6 +557,26 @@ class _RunCommandMixin:
                 *self.fixture_poll_logs(
                     final_body, TaskFinishType.SUCCESS, "done"
                 ),
+            ]
+        )
+
+    def _assert_task_not_success(
+        self, mock_sleep, finish_type, kill_reason=None, detail=""
+    ):
+        result_body = _result_body(
+            finish_type=finish_type, kill_reason=kill_reason
+        )
+        self.server.add_response(200, _task_ident_body())
+        self.server.add_response(200, result_body)
+
+        results = list(self.connector.run_command("some.cmd", {}))
+
+        self.assert_client_results(results, [([], False, None)])
+        self.assert_poll_sleep(mock_sleep, 0)
+        self.assert_logs(
+            [
+                *self.fixture_create_logs(),
+                *self.fixture_poll_logs(result_body, finish_type, detail),
             ]
         )
 

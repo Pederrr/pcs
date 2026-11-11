@@ -72,7 +72,7 @@ class RequestData(TestCase):
         self.assertEqual("42", _request_data(request))
 
 
-class SendRequestBase(TestCase):
+class SendRequestErrors(TestCase):
     def setUp(self):
         self.logger = mock.MagicMock(spec_set=logging.Logger)
         self.transport = _FakeTransport()
@@ -84,11 +84,6 @@ class SendRequestBase(TestCase):
             "/api/v2/task/result", query_params={"task_ident": "tid"}
         )
         self.full_url = f"{BASE_URL}/api/v2/task/result?task_ident=tid"
-
-
-class SendRequestUrlError(SendRequestBase):
-    def setUp(self):
-        super().setUp()
         # Do not depend on proxy variables set in the environment running the
         # tests. Tests checking the proxy warning override this patch.
         patcher = mock.patch.object(client, "is_proxy_set", return_value=False)
@@ -179,8 +174,6 @@ class SendRequestUrlError(SendRequestBase):
             ],
         )
 
-
-class SendRequestOtherErrors(SendRequestBase):
     def test_bare_timeout_error(self):
         self.transport.open_mock.side_effect = TimeoutError("slow")
         with self.assertRaises(ApiV2TimeoutError) as cm:
