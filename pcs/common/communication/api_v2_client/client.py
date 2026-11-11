@@ -158,24 +158,32 @@ class _ApiV2Client:
                 )
                 return body
         except HTTPError as e:
-            self._logger.debug(
-                "Error calling %s: HTTP error: %s %s",
-                request.full_url,
-                e.code,
-                e.reason,
-            )
-            # HTTP 400 from task/create means the payload is inherently
-            # invalid — no node can process it. All 400 cases (api_v2.py):
-            #   - malformed JSON body (prepare)
-            #   - missing request body (RequestBodyMissingError)
-            #   - missing required key in CommandDto (_from_dict_exc_handled)
-            #   - unexpected keys in request body (_from_dict_exc_handled)
-            #   - other payload structure violations (_from_dict_exc_handled)
-            reason = str(e.reason)
-            endpoint = self._transport.label
-            if request_error_on_400 and e.code == 400:
-                raise ApiV2RequestError(endpoint, e.code, reason) from e
-            raise ApiV2CommunicationError(endpoint, e.code, reason) from e
+            # Though being an exception (a subclass of URLError), an HTTPError
+            # can also function as a non-exceptional file-like return value
+            # (the same thing that urlopen() returns).
+            # (https://docs.python.org/3/library/urllib.error.html)
+            #
+            # We should close the file after working with it, otherwise we
+            # can get `ResourceWarning` about not closing the "file".
+            with e:
+                self._logger.debug(
+                    "Error calling %s: HTTP error: %s %s",
+                    request.full_url,
+                    e.code,
+                    e.reason,
+                )
+                # HTTP 400 from task/create means the payload is inherently
+                # invalid — no node can process it. All 400 cases (api_v2.py):
+                #   - malformed JSON body (prepare)
+                #   - missing request body (RequestBodyMissingError)
+                #   - missing required key in CommandDto (_from_dict_exc_handled)
+                #   - unexpected keys in request body (_from_dict_exc_handled)
+                #   - other payload structure violations (_from_dict_exc_handled)
+                reason = str(e.reason)
+                endpoint = self._transport.label
+                if request_error_on_400 and e.code == 400:
+                    raise ApiV2RequestError(endpoint, e.code, reason) from e
+                raise ApiV2CommunicationError(endpoint, e.code, reason) from e
         except URLError as e:
             # Proxy env vars (https_proxy, all_proxy) are respected by
             # urllib and may cause connection failures when set
