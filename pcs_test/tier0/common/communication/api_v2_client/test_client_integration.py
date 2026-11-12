@@ -796,9 +796,7 @@ class UnixConnectionError(_LogCaptureMixin, TestCase):
     def test_missing_socket_is_connection_error(self):
         _isolate_proxy_env(self)
         self._setup_logger()
-        tmp_dir = get_tmp_dir("pcs-apiv2-missing-unix-socket")
-        self.addCleanup(tmp_dir.cleanup)
-        missing_path = os.path.join(tmp_dir.name, "does-not-exist")
+        missing_path = "/this/path/does/not/exist"
 
         connector = ApiV2Connector.for_unix_socket(
             missing_path, self.logger, api_v2_timeout=TIMEOUT
