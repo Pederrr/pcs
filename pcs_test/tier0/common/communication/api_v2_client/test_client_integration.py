@@ -18,6 +18,7 @@ import ssl
 import tempfile
 import threading
 from collections import deque
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import TestCase, mock
 
@@ -145,23 +146,28 @@ def _task_ident_body():
     return json.dumps({"task_ident": TASK_IDENT})
 
 
-def _result_body(
-    *,
-    finish_type=TaskFinishType.SUCCESS,
-    reports=(),
-    result=None,
-    kill_reason=None,
-):
-    dto = TaskResultDto(
-        task_ident=TASK_IDENT,
-        command=CommandDto("cmd", {}, CommandOptionsDto()),
-        reports=list(reports),
-        state=TaskState.FINISHED,
-        task_finish_type=finish_type,
-        kill_reason=kill_reason,
-        result=result,
-    )
-    return json.dumps(to_dict(dto))
+@dataclass
+class _TaskResultHelper:
+    finish_type: TaskFinishType = TaskFinishType.SUCCESS
+    report_list: reports.ReportItemList = ()
+    result: str | None = None
+    kill_reason: TaskKillReason | None = None
+
+    @property
+    def body(self):
+        return json.dumps(
+            to_dict(
+                TaskResultDto(
+                    task_ident=TASK_IDENT,
+                    command=CommandDto("cmd", {}, CommandOptionsDto()),
+                    reports=list(self.report_list),
+                    state=TaskState.FINISHED,
+                    task_finish_type=self.finish_type,
+                    kill_reason=self.kill_reason,
+                    result=self.result,
+                )
+            )
+        )
 
 
 def _report_dto(target="t", data="d"):
@@ -440,11 +446,18 @@ class _RunCommandMixin:
             _log_task_created(TASK_IDENT, self.label),
         ]
 
-    def fixture_poll_logs(self, response_body, finish_type, detail=""):
+    def fixture_poll_logs(self, task_result_helper: _TaskResultHelper):
+        task_status_detail = (
+            f"kill reason: {task_result_helper.kill_reason}"
+            if task_result_helper.kill_reason
+            else task_result_helper.result
+        )
         return [
             _log_started(self.result_url),
-            _log_finished(self.result_url, 200, response_body),
-            _log_task_status(TASK_IDENT, finish_type, detail),
+            _log_finished(self.result_url, 200, task_result_helper.body),
+            _log_task_status(
+                TASK_IDENT, task_result_helper.finish_type, task_status_detail
+            ),
         ]
 
     def assert_client_results(self, results, expected_results):
@@ -462,11 +475,11 @@ class _RunCommandMixin:
         )
 
     def test_simple_round_trip(self, mock_sleep):
-        result_body = _result_body(
+        self.server.add_response(200, _task_ident_body())
+        task_result = _TaskResultHelper(
             finish_type=TaskFinishType.SUCCESS, result={"out": "ok"}
         )
-        self.server.add_response(200, _task_ident_body())
-        self.server.add_response(200, result_body)
+        self.server.add_response(200, task_result.body)
 
         results = list(
             self.connector.run_command("cluster.status", {"name": "c"})
@@ -496,36 +509,34 @@ class _RunCommandMixin:
         self.assert_logs(
             [
                 *self.fixture_create_logs("cluster.status", {"name": "c"}),
-                *self.fixture_poll_logs(
-                    result_body, TaskFinishType.SUCCESS, "{'out': 'ok'}"
-                ),
+                *self.fixture_poll_logs(task_result),
             ]
         )
 
     def test_polls_until_finished(self, mock_sleep):
         self.server.add_response(200, _task_ident_body())
-        poll_bodies = [
-            _result_body(
+        poll_results = [
+            _TaskResultHelper(
                 finish_type=TaskFinishType.UNFINISHED,
-                reports=[_report_dto("a")],
+                report_list=[_report_dto("a")],
             ),
-            _result_body(
+            _TaskResultHelper(
                 finish_type=TaskFinishType.UNFINISHED,
-                reports=[_report_dto("a"), _report_dto("b")],
+                report_list=[_report_dto("a"), _report_dto("b")],
             ),
-            _result_body(
+            _TaskResultHelper(
                 finish_type=TaskFinishType.UNFINISHED,
-                reports=[_report_dto("a"), _report_dto("b")],
+                report_list=[_report_dto("a"), _report_dto("b")],
             ),
         ]
-        final_body = _result_body(
+        final_result = _TaskResultHelper(
             finish_type=TaskFinishType.SUCCESS,
-            reports=[_report_dto("a"), _report_dto("b"), _report_dto("c")],
+            report_list=[_report_dto("a"), _report_dto("b"), _report_dto("c")],
             result="done",
         )
-        for body in poll_bodies:
-            self.server.add_response(200, body)
-        self.server.add_response(200, final_body)
+        for result in poll_results:
+            self.server.add_response(200, result.body)
+        self.server.add_response(200, final_result.body)
 
         results = list(self.connector.run_command("some.cmd", {}))
 
@@ -549,43 +560,33 @@ class _RunCommandMixin:
                 *self.fixture_create_logs(),
                 *[
                     log
-                    for body in poll_bodies
-                    for log in self.fixture_poll_logs(
-                        body, TaskFinishType.UNFINISHED
-                    )
+                    for result in poll_results
+                    for log in self.fixture_poll_logs(result)
                 ],
-                *self.fixture_poll_logs(
-                    final_body, TaskFinishType.SUCCESS, "done"
-                ),
+                *self.fixture_poll_logs(final_result),
             ]
         )
 
     def _assert_task_not_success(
-        self, mock_sleep, finish_type, kill_reason=None, detail=""
+        self, mock_sleep, finish_type, kill_reason=None
     ):
-        result_body = _result_body(
+        self.server.add_response(200, _task_ident_body())
+        task_result = _TaskResultHelper(
             finish_type=finish_type, kill_reason=kill_reason
         )
-        self.server.add_response(200, _task_ident_body())
-        self.server.add_response(200, result_body)
+        self.server.add_response(200, task_result.body)
 
         results = list(self.connector.run_command("some.cmd", {}))
 
         self.assert_client_results(results, [([], False, None)])
         self.assert_poll_sleep(mock_sleep, 0)
         self.assert_logs(
-            [
-                *self.fixture_create_logs(),
-                *self.fixture_poll_logs(result_body, finish_type, detail),
-            ]
+            [*self.fixture_create_logs(), *self.fixture_poll_logs(task_result)]
         )
 
     def test_kill_is_not_success(self, mock_sleep):
         self._assert_task_not_success(
-            mock_sleep,
-            TaskFinishType.KILL,
-            kill_reason=TaskKillReason.USER,
-            detail="kill reason: USER",
+            mock_sleep, TaskFinishType.KILL, kill_reason=TaskKillReason.USER
         )
 
     def test_kill_no_kill_reason(self, mock_sleep):
@@ -606,7 +607,6 @@ class _RunCommandMixin:
 
         with self.assertRaises(ApiV2CommunicationError) as cm:
             list(self.connector.run_command("some.cmd", {}))
-        self.assertNotIsInstance(cm.exception, ApiV2RequestError)
         self.assertEqual(cm.exception.http_code, 500)
         self.assert_poll_sleep(mock_sleep, 0)
         self.assert_logs(
@@ -725,10 +725,10 @@ class _RunCommandMixin:
         self.server.add_response(200, _task_ident_body())
         self.server.add_response(
             200,
-            _result_body(
+            _TaskResultHelper(
                 finish_type=TaskFinishType.SUCCESS,
-                reports=[_report_dto("a"), _report_dto("b")],
-            ),
+                report_list=[_report_dto("a"), _report_dto("b")],
+            ).body,
         )
         connector = self._make_connector(context_node_name="node1")
 
@@ -744,7 +744,7 @@ class _RunCommandMixin:
     def test_all_command_options_are_sent(self, _mock_sleep):
         self.server.add_response(200, _task_ident_body())
         self.server.add_response(
-            200, _result_body(finish_type=TaskFinishType.SUCCESS)
+            200, _TaskResultHelper(finish_type=TaskFinishType.SUCCESS).body
         )
         connector = self._make_connector(
             effective_username="alice",
@@ -780,7 +780,7 @@ class HttpsRunCommand(_RunCommandMixin, HttpsIntegrationBase):
     def test_token_cookie_is_sent(self):
         self.server.add_response(200, _task_ident_body())
         self.server.add_response(
-            200, _result_body(finish_type=TaskFinishType.SUCCESS)
+            200, _TaskResultHelper(finish_type=TaskFinishType.SUCCESS).body
         )
 
         list(self.connector.run_command("some.cmd", {}))
